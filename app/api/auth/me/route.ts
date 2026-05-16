@@ -12,7 +12,7 @@ export async function GET() {
     const supabase = createServiceClient()
     const { data: player } = await supabase
       .from('spinna_players')
-      .select('id, username, email, best_score, total_lifetime_rands, created_at')
+      .select('id, username, email, best_score, total_rands, games_played, created_at')
       .eq('id', session.playerId)
       .single()
 

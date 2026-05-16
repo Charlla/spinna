@@ -6,10 +6,7 @@ async function getLeaderboard() {
     const supabase = createServiceClient()
     const { data } = await supabase
       .from('spinna_scores')
-      .select(`
-        id, score, degrees, combo_count, vehicle, created_at,
-        spinna_players ( username )
-      `)
+      .select('id, score, degrees, combo_count, vehicle, created_at, username')
       .order('score', { ascending: false })
       .limit(50)
 
@@ -21,7 +18,7 @@ async function getLeaderboard() {
       combo_count: s.combo_count,
       vehicle: s.vehicle,
       created_at: s.created_at,
-      username: (s.spinna_players as unknown as { username: string } | null)?.username ?? 'Guest',
+      username: s.username ?? 'Guest',
     })) ?? []
   } catch {
     return []
@@ -97,7 +94,7 @@ export default async function LeaderboardPage() {
                     color: entry.rank === 1 ? '#fcd00b' : entry.rank === 2 ? '#e5e7eb' : entry.rank === 3 ? '#fb923c' : '#6b7280'
                   }}
                 >
-                  {entry.rank === 1 ? '1' : entry.rank === 2 ? '2' : entry.rank === 3 ? '3' : `${entry.rank}`}
+                  {entry.rank}
                 </div>
 
                 {/* Player */}
@@ -107,10 +104,14 @@ export default async function LeaderboardPage() {
                     <span className="text-[8px] font-mono text-white/40 tracking-widest">
                       {VEHICLE_LABELS[entry.vehicle] ?? entry.vehicle}
                     </span>
-                    <span className="text-[8px] font-mono text-white/25">·</span>
-                    <span className="text-[8px] font-mono text-white/40">
-                      {Math.floor(entry.degrees)}°
-                    </span>
+                    {entry.degrees > 0 && (
+                      <>
+                        <span className="text-[8px] font-mono text-white/25">·</span>
+                        <span className="text-[8px] font-mono text-white/40">
+                          {Math.floor(entry.degrees)}°
+                        </span>
+                      </>
+                    )}
                     <span className="text-[8px] font-mono text-white/25">·</span>
                     <span className="text-[8px] font-mono text-white/30">{formatDate(entry.created_at)}</span>
                   </div>
