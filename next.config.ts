@@ -1,7 +1,11 @@
-import type { NextConfig } from "next";
+import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
-  /* config options here */
-};
+  // Canvas is client-only, exclude from server-side rendering
+  serverExternalPackages: [],
+  typescript: {
+    ignoreBuildErrors: false,
+  },
+}
 
-export default nextConfig;
+export default nextConfig
