@@ -193,8 +193,9 @@ export class CarPhysics {
       : gripLong * (1 - 0.45 * Math.tanh((absSlip - 0.12) * 2.5))
     fLong = sign(slipLong) * fLong
 
-    // Wheel speed update
-    const wheelAcc = (driveForce - fLong) / 0.55
+    // Wheel speed update. 0.55 = wheel inertia (was original); 0.40 gives
+    // a snappier launch — wheel spins up faster, car responds sooner.
+    const wheelAcc = (driveForce - fLong) / 0.40
     this.wheelLinSpeed += (hbrk ? wheelAcc - 18 * this.wheelLinSpeed : wheelAcc) * dt
     this.wheelLinSpeed *= 1 - 0.35 * dt
     if (hbrk && Math.abs(this.wheelLinSpeed) < 1.5) this.wheelLinSpeed = 0
@@ -549,7 +550,7 @@ export function updateParticles(particles: Particle[], dt: number, gravity = fal
     p.vx *= 1 - (gravity ? 0.6 : 1.2) * dt
     p.vy *= 1 - (gravity ? 0.6 : 1.2) * dt
     if (gravity) p.vy += 60 * dt
-    if (!gravity) p.r += 28 * dt // smoke expands
+    if (!gravity) p.r += 14 * dt // smoke expands (slowed so longer-lived puffs don't blow up)
   }
 }
 
@@ -1023,22 +1024,27 @@ export function spawnSmoke(
   slipping: boolean
 ) {
   if (!wheelspin && !slipping) return
-  if (smoke.length > 80) return
+  // Thicker plumes: bigger cap and more spawns per frame.
+  if (smoke.length > 220) return
   const wheels = car.rearWheels()
+  const speed = Math.hypot(car.vx, car.vy)
+  const intensity = wheelspin && slipping ? 2 : 1  // both = double the puffs
   for (const w of wheels) {
-    if (Math.random() > 0.4) continue
-    const speed = Math.hypot(car.vx, car.vy)
-    smoke.push({
-      x: w.x + rand(-2, 2),
-      y: w.y + rand(-2, 2),
-      vx: -car.vx * 0.1 + rand(-8, 8),
-      vy: -car.vy * 0.1 + rand(-8, 8),
-      r: rand(4, 8),
-      life: rand(0.4, 0.9),
-      maxLife: 0.9,
-      alpha: clamp(0.3 + speed / 500, 0.15, 0.7),
-      color: '140,130,120',
-    })
+    for (let i = 0; i < intensity; i++) {
+      if (Math.random() > 0.85) continue
+      smoke.push({
+        x: w.x + rand(-3, 3),
+        y: w.y + rand(-3, 3),
+        vx: -car.vx * 0.08 + rand(-12, 12),
+        vy: -car.vy * 0.08 + rand(-12, 12),
+        r: rand(5, 10),
+        // Was 0.4–0.9s — now 1.6–2.4s so the trail hangs much longer.
+        life: rand(1.6, 2.4),
+        maxLife: 2.4,
+        alpha: clamp(0.35 + speed / 480, 0.2, 0.75),
+        color: '140,130,120',
+      })
+    }
   }
 }
 

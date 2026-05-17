@@ -202,6 +202,258 @@ function StepHeader({ step }: { step: Step }) {
   )
 }
 
+// ── Carousel: pick one car at a time with left/right ──────────────────────────
+function CarCarousel({
+  cars, currentId, ownedIds, money, onSelect, onBuy, onContinue,
+}: {
+  cars: Car[]
+  currentId: string
+  ownedIds: string[]
+  money: number
+  onSelect: (id: string) => void
+  onBuy: (c: Car) => void
+  onContinue: () => void
+}) {
+  const startIdx = Math.max(0, cars.findIndex(c => c.id === currentId))
+  const [idx, setIdx] = useState(startIdx)
+  const car = cars[idx]
+  const owned = ownedIds.includes(car.id)
+  const canAfford = money >= car.price
+
+  const go = (delta: number) =>
+    setIdx(i => (i + delta + cars.length) % cars.length)
+
+  return (
+    <div className="space-y-3">
+      <div className="text-[9px] tracking-[4px] font-mono text-white/40 uppercase text-center">
+        Pick your ride
+      </div>
+
+      <div className="relative rounded-xl border border-white/10 bg-gradient-to-b from-amber-950/20 via-black/60 to-black/70 backdrop-blur-md overflow-hidden py-6 px-3">
+        {/* Spotlight glow */}
+        <div
+          className="absolute inset-x-0 top-0 h-40 pointer-events-none"
+          style={{ background: 'radial-gradient(circle at 50% 0%, rgba(252,208,11,0.18), transparent 60%)' }}
+        />
+
+        {/* Index dots */}
+        <div className="flex justify-center gap-1 mb-3">
+          {cars.map((c, i) => (
+            <span
+              key={c.id}
+              className="w-1.5 h-1.5 rounded-full transition-all"
+              style={{
+                backgroundColor: i === idx ? '#fcd00b' : ownedIds.includes(c.id) ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.12)',
+                transform: i === idx ? 'scale(1.4)' : 'scale(1)',
+              }}
+            />
+          ))}
+        </div>
+
+        <div className="flex items-stretch gap-2">
+          <button
+            onClick={() => go(-1)}
+            aria-label="Previous car"
+            className="shrink-0 w-9 self-stretch rounded-md border border-white/10 bg-black/40 hover:bg-black/60 active:bg-amber-400/10 transition flex items-center justify-center text-white/60 hover:text-amber-300 text-2xl"
+          >
+            ‹
+          </button>
+
+          <div className="flex-1 flex flex-col items-center text-center px-1">
+            {/* Big car preview with subtle float animation */}
+            <div className="relative" style={{ filter: owned ? 'none' : 'grayscale(0.6) brightness(0.7)' }}>
+              <div
+                className="absolute -inset-4 rounded-full pointer-events-none"
+                style={{ background: 'radial-gradient(circle, rgba(252,208,11,0.18) 0%, transparent 65%)' }}
+              />
+              <div className="relative animate-[carfloat_3s_ease-in-out_infinite]">
+                <CarPreview car={car} size="lg" />
+              </div>
+            </div>
+            <div className="mt-4 text-[9px] tracking-[4px] font-mono text-amber-300/80 uppercase">
+              {car.tag}
+            </div>
+            <div className="mt-1 font-mono font-extrabold text-white text-lg leading-tight">
+              {car.name}
+            </div>
+
+            {/* Stat bars */}
+            <div className="w-full max-w-[220px] mt-4 space-y-1.5">
+              <StatRow label="PWR" value={car.powerStat} color="#ef4444" />
+              <StatRow label="GRIP" value={car.gripStat} color="#22c55e" />
+              <StatRow label="MASS" value={car.weightStat} color="#3b82f6" />
+            </div>
+          </div>
+
+          <button
+            onClick={() => go(1)}
+            aria-label="Next car"
+            className="shrink-0 w-9 self-stretch rounded-md border border-white/10 bg-black/40 hover:bg-black/60 active:bg-amber-400/10 transition flex items-center justify-center text-white/60 hover:text-amber-300 text-2xl"
+          >
+            ›
+          </button>
+        </div>
+
+        <style jsx>{`
+          @keyframes carfloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+        `}</style>
+      </div>
+
+      {/* Action button */}
+      {owned ? (
+        <button
+          onClick={() => { onSelect(car.id); onContinue() }}
+          className="w-full rounded-lg font-mono text-[13px] tracking-[4px] font-extrabold text-black bg-amber-300 hover:bg-amber-200 active:scale-[0.99] transition py-3 shadow-[0_0_20px_rgba(252,208,11,0.3)]"
+        >
+          DRIVE {car.name.split(' ').slice(-1)} ▸
+        </button>
+      ) : canAfford ? (
+        <button
+          onClick={() => onBuy(car)}
+          className="w-full rounded-lg font-mono text-[13px] tracking-[4px] font-extrabold text-black bg-emerald-300 hover:bg-emerald-200 active:scale-[0.99] transition py-3 shadow-[0_0_20px_rgba(34,197,94,0.3)]"
+        >
+          BUY R{car.price.toLocaleString()}
+        </button>
+      ) : (
+        <button disabled className="w-full rounded-lg font-mono text-[13px] tracking-[4px] font-bold text-white/40 bg-white/5 py-3 cursor-not-allowed">
+          R{car.price.toLocaleString()} — NEED MORE RANDS
+        </button>
+      )}
+    </div>
+  )
+}
+
+function StatRow({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-[8px] font-mono text-white/45 w-9 tracking-[1.5px]">{label}</span>
+      <StatBar value={value} color={color} />
+    </div>
+  )
+}
+
+// ── Tire carousel ─────────────────────────────────────────────────────────────
+function TireCarousel({
+  tires, currentId, tireHealth, onSelect,
+}: {
+  tires: Tire[]
+  currentId: string
+  tireHealth: number
+  onSelect: (id: string) => void
+}) {
+  const startIdx = Math.max(0, tires.findIndex(t => t.id === currentId))
+  const [idx, setIdx] = useState(startIdx)
+  const tire = tires[idx]
+  const isFitted = tire.id === currentId
+
+  const go = (delta: number) =>
+    setIdx(i => (i + delta + tires.length) % tires.length)
+
+  return (
+    <div className="space-y-3">
+      <div className="text-[9px] tracking-[4px] font-mono text-white/40 uppercase text-center">
+        Mount your tyres
+      </div>
+
+      <div className="relative rounded-xl border border-white/10 bg-gradient-to-b from-zinc-900/40 via-black/60 to-black/70 backdrop-blur-md overflow-hidden py-6 px-3">
+        <div
+          className="absolute inset-x-0 top-0 h-32 pointer-events-none"
+          style={{ background: 'radial-gradient(circle at 50% 0%, rgba(255,255,255,0.10), transparent 60%)' }}
+        />
+
+        {/* Index dots */}
+        <div className="flex justify-center gap-1 mb-3">
+          {tires.map((t, i) => (
+            <span
+              key={t.id}
+              className="w-1.5 h-1.5 rounded-full transition-all"
+              style={{
+                backgroundColor: i === idx ? '#fcd00b' : 'rgba(255,255,255,0.18)',
+                transform: i === idx ? 'scale(1.4)' : 'scale(1)',
+              }}
+            />
+          ))}
+        </div>
+
+        <div className="flex items-stretch gap-2">
+          <button
+            onClick={() => go(-1)}
+            aria-label="Previous tyre"
+            className="shrink-0 w-9 self-stretch rounded-md border border-white/10 bg-black/40 hover:bg-black/60 transition flex items-center justify-center text-white/60 hover:text-amber-300 text-2xl"
+          >
+            ‹
+          </button>
+
+          <div className="flex-1 flex flex-col items-center text-center px-1">
+            <TirePreview />
+            <div className="mt-3 font-mono font-extrabold text-white text-base leading-tight">
+              {tire.name}
+            </div>
+            <div className="mt-1 text-[10px] font-mono text-white/50">{tire.desc}</div>
+            <div className="mt-1 text-[10px] font-mono text-amber-300/90">R{tire.price}</div>
+            <div className="w-full max-w-[200px] mt-3 space-y-1.5">
+              <StatRow label="GRIP" value={tire.gripStat} color="#22c55e" />
+              <StatRow label="LIFE" value={tire.lifeStat} color="#3b82f6" />
+            </div>
+            {isFitted && (
+              <div className="mt-2 text-[9px] font-mono text-amber-300 tracking-[3px]">CURRENTLY FITTED · {Math.floor(tireHealth)}%</div>
+            )}
+          </div>
+
+          <button
+            onClick={() => go(1)}
+            aria-label="Next tyre"
+            className="shrink-0 w-9 self-stretch rounded-md border border-white/10 bg-black/40 hover:bg-black/60 transition flex items-center justify-center text-white/60 hover:text-amber-300 text-2xl"
+          >
+            ›
+          </button>
+        </div>
+      </div>
+
+      <button
+        onClick={() => onSelect(tire.id)}
+        className="w-full rounded-lg font-mono text-[13px] tracking-[4px] font-extrabold text-black bg-amber-300 hover:bg-amber-200 active:scale-[0.99] transition py-3 shadow-[0_0_20px_rgba(252,208,11,0.3)]"
+      >
+        FIT FRESH ▸
+      </button>
+    </div>
+  )
+}
+
+function TirePreview() {
+  return (
+    <svg viewBox="0 0 100 100" width={96} height={96} aria-hidden="true">
+      <defs>
+        <radialGradient id="tireG" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#2a2a30" />
+          <stop offset="70%" stopColor="#0a0a0a" />
+          <stop offset="100%" stopColor="#000" />
+        </radialGradient>
+      </defs>
+      <circle cx="50" cy="50" r="46" fill="url(#tireG)" />
+      <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="1" />
+      {/* Tread blocks */}
+      {Array.from({ length: 16 }).map((_, i) => {
+        const a = (i / 16) * Math.PI * 2
+        const x1 = 50 + Math.cos(a) * 38
+        const y1 = 50 + Math.sin(a) * 38
+        const x2 = 50 + Math.cos(a) * 46
+        const y2 = 50 + Math.sin(a) * 46
+        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="rgba(255,255,255,0.18)" strokeWidth="2" />
+      })}
+      {/* Rim */}
+      <circle cx="50" cy="50" r="22" fill="#1a1a20" />
+      <circle cx="50" cy="50" r="22" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="1" />
+      {/* Spokes */}
+      {Array.from({ length: 5 }).map((_, i) => {
+        const a = (i / 5) * Math.PI * 2 - Math.PI / 2
+        return <line key={i} x1="50" y1="50" x2={50 + Math.cos(a) * 20} y2={50 + Math.sin(a) * 20} stroke="#3a3a44" strokeWidth="3" />
+      })}
+      <circle cx="50" cy="50" r="4" fill="#fcd00b" opacity="0.8" />
+    </svg>
+  )
+}
+
 export default function SpinnaGarage({ save, onSave, onPlay, player, onLogin, onLogout }: SpinnaGarageProps) {
   const [step, setStep] = useState<Step>('car')
 
@@ -285,93 +537,34 @@ export default function SpinnaGarage({ save, onSave, onPlay, player, onLogin, on
 
         <StepHeader step={step} />
 
-        {/* ── Step 1: Pick your ride ──────────────────────────────────────── */}
+        {/* ── Step 1: Pick your ride — single-car spotlight carousel ──────── */}
         {step === 'car' && (
-          <div className="space-y-4">
-            <div className="text-[9px] tracking-[4px] font-mono text-white/40 uppercase">
-              Pick your ride
-            </div>
-
-            {/* Owned cars first */}
-            <div className="space-y-2">
-              <div className="text-[8px] tracking-[3px] font-mono text-white/30 uppercase">
-                Your stable ({ownedCars.length})
-              </div>
-              {ownedCars.map(c => (
-                <CarRow
-                  key={c.id}
-                  car={c}
-                  owned
-                  selected={save.car === c.id}
-                  canAfford
-                  onSelect={() => selectCar(c.id)}
-                  onBuy={() => {}}
-                />
-              ))}
-            </div>
-
-            {/* Dealer */}
-            {unownedCars.length > 0 && (
-              <div className="space-y-2 pt-2">
-                <div className="text-[8px] tracking-[3px] font-mono text-white/30 uppercase">
-                  Dealer
-                </div>
-                {unownedCars.map(c => (
-                  <CarRow
-                    key={c.id}
-                    car={c}
-                    owned={false}
-                    selected={false}
-                    canAfford={save.money >= c.price}
-                    onSelect={() => {}}
-                    onBuy={() => buyCar(c)}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+          <CarCarousel
+            cars={CARS}
+            currentId={save.car}
+            ownedIds={save.ownedCars}
+            money={save.money}
+            onSelect={selectCar}
+            onBuy={buyCar}
+            onContinue={() => setStep('tires')}
+          />
         )}
 
-        {/* ── Step 2: Pick your tyres ─────────────────────────────────────── */}
+        {/* ── Step 2: Pick your tyres — single-tire spotlight carousel ────── */}
         {step === 'tires' && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <button
               onClick={() => setStep('car')}
               className="text-[10px] font-mono text-white/40 hover:text-white/70 transition"
             >
               ← Back to ride
             </button>
-            <div className="text-[9px] tracking-[4px] font-mono text-white/40 uppercase">
-              Mount your tyres
-            </div>
-            {/* Currently-fitted health bar */}
-            <div className="bg-black/40 rounded-lg border border-white/10 px-3 py-2">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[9px] font-mono text-white/40 tracking-[3px]">CURRENT</span>
-                <span className="text-[9px] font-mono text-white/60">{Math.floor(save.tireHealth)}%</span>
-              </div>
-              <div className="h-2 rounded-full bg-white/10 overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: `${save.tireHealth}%`,
-                    backgroundColor: save.tireHealth > 50 ? '#22c55e' : save.tireHealth > 20 ? '#f97316' : '#ef4444'
-                  }}
-                />
-              </div>
-              <div className="mt-1 text-[9px] font-mono text-white/40">Picking a tyre fits a fresh set.</div>
-            </div>
-            <div className="space-y-2">
-              {TIRES.map(t => (
-                <TireRow
-                  key={t.id}
-                  tire={t}
-                  selected={save.tires === t.id}
-                  canAfford
-                  onSelect={() => selectTire(t.id)}
-                />
-              ))}
-            </div>
+            <TireCarousel
+              tires={TIRES}
+              currentId={save.tires}
+              tireHealth={save.tireHealth}
+              onSelect={selectTire}
+            />
           </div>
         )}
 

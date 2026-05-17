@@ -15,49 +15,59 @@ function extractSpeed(hud: string): number {
 }
 
 test.describe.serial('Spinna smoke', () => {
-  test('garage opens on step 1 (Pick your ride)', async ({ page }) => {
+  test('garage opens on the car carousel', async ({ page }) => {
     await page.goto('/')
-    await expect(page.getByText(/Pick your ride/i)).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByText(/Your stable/i)).toBeVisible()
-    await expect(page.getByText(/BMW E30/)).toBeVisible()
+    await expect(page.getByText(/Pick your ride/i).first()).toBeVisible({ timeout: 15_000 })
+    // Default-selected car is the E30 (owned)
+    await expect(page.getByText(/BMW E30 325i/)).toBeVisible()
+    // Carousel has Prev / Next nav buttons
+    await expect(page.getByRole('button', { name: /Next car/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Previous car/i })).toBeVisible()
   })
 
-  test('sequential flow: pick car → pick tyres → SPIN button appears', async ({ page }) => {
+  test('sequential flow: confirm ride → fit tyres → SPIN', async ({ page }) => {
     await page.goto('/')
-    // Step 1
-    await expect(page.getByText(/Pick your ride/i)).toBeVisible({ timeout: 15_000 })
-    // Click the owned E30 row
-    await page.getByText('BMW E30 325i').click()
-    // Step 2 — tyres
-    await expect(page.getByText(/Mount your tyres/i)).toBeVisible({ timeout: 5_000 })
-    await expect(page.getByText(/BUDGET ALL-SEASON/)).toBeVisible()
-    await page.getByText('BUDGET ALL-SEASON').click()
-    // Step 3 — confirm
+    // Step 1 — confirm the E30 (DRIVE button takes you to step 2)
+    await expect(page.getByText(/Pick your ride/i).first()).toBeVisible({ timeout: 15_000 })
+    await page.getByRole('button', { name: /^DRIVE/ }).click()
+    // Step 2 — tyres carousel
+    await expect(page.getByText(/Mount your tyres/i).first()).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByRole('button', { name: /^FIT FRESH/ })).toBeVisible()
+    await page.getByRole('button', { name: /^FIT FRESH/ }).click()
+    // Step 3 — confirm + SPIN
     await expect(page.getByText(/Ready to spin/i)).toBeVisible({ timeout: 5_000 })
-    await expect(page.getByRole('button', { name: /SPIN/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^SPIN/ })).toBeVisible()
   })
 
   test('guest can run through the flow without signing in', async ({ page }) => {
     await page.goto('/')
     await expect(page.getByText(/Sign in to save scores/i)).toBeVisible({ timeout: 5_000 })
-    await page.getByText('BMW E30 325i').click()
-    await page.getByText('BUDGET ALL-SEASON').click()
-    await page.getByRole('button', { name: /SPIN/i }).click()
+    await page.getByRole('button', { name: /^DRIVE/ }).click()
+    await page.getByRole('button', { name: /^FIT FRESH/ }).click()
+    await page.getByRole('button', { name: /^SPIN/ }).click()
     await page.waitForURL(/\/game/, { timeout: 5_000 })
     await expect(page.locator('canvas').first()).toBeVisible({ timeout: 10_000 })
   })
 
   test('SPIN navigates to /game and canvas renders', async ({ page }) => {
     await page.goto('/')
-    await page.getByText('BMW E30 325i').click()
-    await page.getByText('BUDGET ALL-SEASON').click()
-    await page.getByRole('button', { name: /SPIN/i }).click()
+    await page.getByRole('button', { name: /^DRIVE/ }).click()
+    await page.getByRole('button', { name: /^FIT FRESH/ }).click()
+    await page.getByRole('button', { name: /^SPIN/ }).click()
     await page.waitForURL(/\/game/, { timeout: 5_000 })
     const canvas = page.locator('canvas')
     await expect(canvas.first()).toBeVisible({ timeout: 10_000 })
     const box = await canvas.first().boundingBox()
     expect(box?.width ?? 0).toBeGreaterThan(100)
     expect(box?.height ?? 0).toBeGreaterThan(100)
+  })
+
+  test('carousel ← / → cycles through cars', async ({ page }) => {
+    await page.goto('/')
+    await expect(page.getByText(/BMW E30 325i/)).toBeVisible({ timeout: 15_000 })
+    await page.getByRole('button', { name: /Next car/i }).click()
+    // Should now show a different car (E36 next in list)
+    await expect(page.getByText(/BMW E36 328i/)).toBeVisible({ timeout: 3_000 })
   })
 
   test('HUD shows score / bank / km-h chips and CASH+TUNE buttons', async ({ page }) => {
@@ -101,11 +111,11 @@ test.describe.serial('Spinna smoke', () => {
     const parsed = JSON.parse(stored!) as { enginePower: number }
     expect(parsed.enginePower).toBeCloseTo(2.10, 1)
 
-    // Reset button restores defaults (enginePower → 1.55)
+    // Reset button restores defaults (enginePower default is 1.85 — see DEFAULT_TUNE)
     await dialog.getByRole('button', { name: /RESET TO DEFAULTS/i }).click()
     const stored2 = await page.evaluate(() => localStorage.getItem('spinna_tune_v3'))
     const parsed2 = JSON.parse(stored2!) as { enginePower: number }
-    expect(parsed2.enginePower).toBeCloseTo(1.55, 2)
+    expect(parsed2.enginePower).toBeCloseTo(1.85, 2)
   })
 
   test('throttle slider sticks at tapped position', async ({ page }) => {

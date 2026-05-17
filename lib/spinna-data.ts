@@ -27,7 +27,7 @@ export const ARENA = {l:80,t:80,r:1420,b:1420}
 
 export const DEFAULT_SAVE = {money:5000,car:"e30",ownedCars:["e30"],tires:"budget",tireHealth:100,bestPayout:0,bestScore:0,totalLifetimeRands:0}
 
-export const DEFAULT_TUNE = {enginePower:1.55,topSpeed:1,steerMaxRad:0.96,steerMinRad:0.227,gripLong:1.2,gripLat:0.75,lowSpeedStick:0.55,yawDamping:1,wearRate:0.05,rearBias:1.4,spinThrottle:0.6}
+export const DEFAULT_TUNE = {enginePower:1.85,topSpeed:1,steerMaxRad:0.96,steerMinRad:0.227,gripLong:1.2,gripLat:0.75,lowSpeedStick:0.55,yawDamping:1,wearRate:0.05,rearBias:1.4,spinThrottle:0.6}
 
 export const MILESTONES = [
   {deg:360,text:"SPIN!",sub:"MFANA",c:"#fcd00b"},
