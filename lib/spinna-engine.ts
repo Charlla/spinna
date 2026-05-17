@@ -1492,8 +1492,20 @@ export function spawnSmoke(
   }
 }
 
-export function drawSmoke(ctx: CanvasRenderingContext2D, smoke: Particle[]) {
+// How long a smoke puff sits "low" on the ground (drawn under the car) before
+// it starts to rise into the air (drawn over the car). Tuned so a puff that
+// just spawned at the rear wheels reads as ground dust, but you actually
+// vanish into your own trail if you come back around through it.
+const SMOKE_LIFT_DELAY = 0.35  // seconds since spawn
+
+function smokeAge(p: Particle): number {
+  return p.maxLife - p.life
+}
+
+/** Draws smoke puffs whose age < SMOKE_LIFT_DELAY — i.e. ground-level, below the car. */
+export function drawSmokeBelow(ctx: CanvasRenderingContext2D, smoke: Particle[]) {
   for (const p of smoke) {
+    if (smokeAge(p) >= SMOKE_LIFT_DELAY) continue
     const t = 1 - p.life / p.maxLife
     const alpha = p.alpha * (1 - t * 0.8)
     ctx.fillStyle = `rgba(${p.color},${alpha.toFixed(2)})`
@@ -1501,6 +1513,29 @@ export function drawSmoke(ctx: CanvasRenderingContext2D, smoke: Particle[]) {
     ctx.arc(p.x, p.y, p.r, 0, TWO_PI)
     ctx.fill()
   }
+}
+
+/** Draws smoke puffs that have lifted above the ground — drawn over the car
+ *  so the player can disappear into their own trail when they cross it again. */
+export function drawSmokeAbove(ctx: CanvasRenderingContext2D, smoke: Particle[]) {
+  for (const p of smoke) {
+    if (smokeAge(p) < SMOKE_LIFT_DELAY) continue
+    const t = 1 - p.life / p.maxLife
+    // Brief 0.2s fade-in as it "rises" so the swap doesn't pop.
+    const sinceLift = Math.min(1, (smokeAge(p) - SMOKE_LIFT_DELAY) / 0.2)
+    const alpha = p.alpha * (1 - t * 0.8) * (0.6 + 0.4 * sinceLift)
+    ctx.fillStyle = `rgba(${p.color},${alpha.toFixed(2)})`
+    ctx.beginPath()
+    ctx.arc(p.x, p.y, p.r, 0, TWO_PI)
+    ctx.fill()
+  }
+}
+
+/** Backwards-compat shim — same as drawSmokeBelow + drawSmokeAbove combined,
+ *  rendered as a single layer. New callers should use the split pair. */
+export function drawSmoke(ctx: CanvasRenderingContext2D, smoke: Particle[]) {
+  drawSmokeBelow(ctx, smoke)
+  drawSmokeAbove(ctx, smoke)
 }
 
 export function drawSparks(ctx: CanvasRenderingContext2D, sparks: Particle[]) {

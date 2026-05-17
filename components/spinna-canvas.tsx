@@ -4,7 +4,7 @@ import { useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 
 import {
   CarPhysics, ConePhysics, CameraState,
   createScoreState, updateScore, applyWallDamage,
-  drawTireMarks, drawFloor, drawSmoke, drawSparks, drawCrowd,
+  drawTireMarks, drawFloor, drawSmokeBelow, drawSmokeAbove, drawSparks, drawCrowd,
   spawnSmoke, updateParticles, buildCrowd,
   initAudio, resumeAudio, updateAudio, playBoom,
   Particle,
@@ -350,13 +350,17 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
         drawTargets(ctx, s.targets)
       }
 
-      // Smoke (behind car)
-      drawSmoke(ctx, s.smoke)
+      // Smoke — ground-level layer (drawn under the car)
+      drawSmokeBelow(ctx, s.smoke)
 
       // Car
       if (s.car) {
         s.car.draw(ctx)
       }
+
+      // Smoke — risen layer (drawn over the car so you disappear into your
+      // own trail when you spin back through it)
+      drawSmokeAbove(ctx, s.smoke)
 
       // Sparks
       drawSparks(ctx, s.sparks)
