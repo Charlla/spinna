@@ -34,10 +34,18 @@ export default function SpinnaControls({ inputsRef, resetKey }: SpinnaControlsPr
     }
   }, [])
 
-  // Game input tick
+  // Game input tick — analog ramping so the throttle/steering build up smoothly.
+  // (Matches the original; binary input causes immediate spin-out.)
   useEffect(() => {
     let raf: number
-    const tick = () => {
+    let lastT = 0
+    const RAMP_UP = 3.2
+    const RAMP_DN = 6.0
+    const STEER_RATE = 4.5
+
+    const tick = (now: number) => {
+      const dt = lastT === 0 ? 1 / 60 : Math.min((now - lastT) / 1000, 1 / 20)
+      lastT = now
       const keys = keysRef.current
       if (!inputsRef.current) { raf = requestAnimationFrame(tick); return }
 
@@ -47,18 +55,32 @@ export default function SpinnaControls({ inputsRef, resetKey }: SpinnaControlsPr
       const steerRight = keys.has('ArrowRight') || keys.has('KeyD')
       const hbrk = keys.has('Space') || keys.has('ShiftLeft') || keys.has('ShiftRight')
 
-      let throttle = 0
-      if (throttleUp) throttle = 1
-      else if (throttleDown) throttle = -1
+      // Touch directly sets the target — don't ramp when a touch is held
+      const touchActive = leftTouchRef.current !== null || rightTouchRef.current !== null
+      if (!touchActive) {
+        const t = inputsRef.current.throttle
+        let target = 0
+        if (throttleUp) target = 1
+        else if (throttleDown) target = -1
+        const rate = (target !== 0 && Math.sign(target) === Math.sign(t)) ? RAMP_UP : RAMP_DN
+        const dir = Math.sign(target - t)
+        if (dir !== 0) {
+          const next = t + dir * rate * dt
+          inputsRef.current.throttle = dir > 0 ? Math.min(next, target) : Math.max(next, target)
+        }
 
-      let steer = 0
-      if (steerLeft) steer = -1
-      else if (steerRight) steer = 1
+        const s = inputsRef.current.steer
+        let steerTarget = 0
+        if (steerLeft) steerTarget = -1
+        else if (steerRight) steerTarget = 1
+        const ds = Math.sign(steerTarget - s)
+        if (ds !== 0) {
+          const sNext = s + ds * STEER_RATE * dt
+          inputsRef.current.steer = ds > 0 ? Math.min(sNext, steerTarget) : Math.max(sNext, steerTarget)
+        }
+      }
 
-      inputsRef.current.throttle = throttle
-      inputsRef.current.steer = steer
       inputsRef.current.hbrk = hbrk
-
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
