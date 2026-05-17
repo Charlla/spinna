@@ -236,15 +236,21 @@ export class CarPhysics {
     this.wheelspin = reversing ? 0 : clamp((Math.abs(slipLong) - 0.15) / 0.6, 0, 1) *
       (Math.abs(this.slipAngleF) > 0.05 || hbrk ? 1 : 0)
 
-    // Forces in world frame
+    // Body-frame decomposition of the front-wheel lateral force.
+    // The front wheel is steered by steerAngle relative to the body,
+    // so its lateral force points (sin·forward, cos·lateral) in body axes.
+    //   front_x_body = component along the forward axis (helps speed up/slow down)
+    //   front_y_body = component along the lateral axis  (helps yaw)
+    // Original bicycle-model decomposition — DO NOT swap these. Swapping them
+    // (the previous bug) made the steering feel broken.
     const sinSt = Math.sin(steerAngle)
     const cosSt = Math.cos(steerAngle)
-    const fxF = -fLatF * sinSt
-    const fyF = fLatF * cosSt
+    const front_x_body = -fLatF * sinSt
+    const front_y_body =  fLatF * cosSt
 
-    const ax = fLong + fyF + (-v_fwd * Math.abs(v_fwd) * 9e-4 - 0.18 * v_fwd)
-    const ay = fLatR + fxF + (-v_lat * Math.abs(v_lat) * 0.0014 - 0.6 * v_lat)
-    const torque = (fxF * this.Lf - fLatR * this.Lr) / this.inertia
+    const ax = fLong   + front_x_body + (-v_fwd * Math.abs(v_fwd) * 9e-4 - 0.18 * v_fwd)
+    const ay = fLatR   + front_y_body + (-v_lat * Math.abs(v_lat) * 0.0014 - 0.6 * v_lat)
+    const torque = (front_y_body * this.Lf - fLatR * this.Lr) / this.inertia
 
     this.omega += torque * dt
     this.omega *= Math.exp(-tune.yawDamping * dt)
@@ -289,6 +295,10 @@ export class CarPhysics {
   }
 
   rearWheels() {
+    // `localToWorld` interprets its second argument in a math-y-up frame —
+    // a y-flip is baked in (see the formula). To get the rear axle (which sits
+    // at canvas-y = +Lr in the body frame, i.e. behind the centre) we must
+    // pass ly = -Lr to the math-frame transform.
     const ly = -this.Lr
     const hw = this.width / 2
     return [
@@ -298,7 +308,16 @@ export class CarPhysics {
   }
 
   draw(ctx: CanvasRenderingContext2D) {
+    // Convention: in this canvas-local frame, −y is FORWARD (where the
+    // headlights point), +y is REAR (tail-lights). Front axle is at y=−Lf,
+    // rear axle at y=+Lr.
     const { bounceFlash, def, width: w, totalLen: h } = this
+    const hw = w / 2
+    const front_y = -this.Lf
+    const rear_y  =  this.Lr
+    const nose_y  = -h / 2
+    const tail_y  =  h / 2
+
     ctx.save()
     ctx.translate(this.x, this.y)
     ctx.rotate(this.heading)
@@ -306,68 +325,106 @@ export class CarPhysics {
     // Shadow
     ctx.fillStyle = 'rgba(0,0,0,0.55)'
     ctx.beginPath()
-    ctx.ellipse(2, 4, w / 2 + 4, h / 2 + 4, 0, 0, TWO_PI)
+    ctx.ellipse(2, 4, hw + 4, h / 2 + 4, 0, 0, TWO_PI)
     ctx.fill()
 
     // Body
-    let bodyColor = def.color
-    if (bounceFlash > 0) bodyColor = '#ffe4e4'
+    const bodyColor = bounceFlash > 0 ? '#ffe4e4' : def.color
     ctx.fillStyle = bodyColor
-    ctx.fillRect(-w / 2, -h / 2, w, h)
+    ctx.fillRect(-hw, nose_y, w, h)
 
-    // Panel lines
+    // Panel cut-lines along the doors
     ctx.fillStyle = 'rgba(0,0,0,0.18)'
-    ctx.fillRect(-w / 2 + 4, -h / 2 + 12, w - 8, 1)
-    ctx.fillRect(-w / 2 + 4, h / 2 - 14, w - 8, 1)
+    ctx.fillRect(-hw + 4, nose_y + 12, w - 8, 1)
+    ctx.fillRect(-hw + 4, tail_y - 14, w - 8, 1)
 
-    // Accent
+    // Accent stripe(s)
     if (def.accentColor === 'M-stripe') {
-      ctx.fillStyle = '#1c69d4'; ctx.fillRect(-w / 2, -2.5, w, 1.4)
-      ctx.fillStyle = '#3e1f7d'; ctx.fillRect(-w / 2, -1, w, 1.4)
-      ctx.fillStyle = '#e30613'; ctx.fillRect(-w / 2, 0.5, w, 1.4)
+      ctx.fillStyle = '#1c69d4'; ctx.fillRect(-hw, -2.5, w, 1.4)
+      ctx.fillStyle = '#3e1f7d'; ctx.fillRect(-hw, -1,   w, 1.4)
+      ctx.fillStyle = '#e30613'; ctx.fillRect(-hw,  0.5, w, 1.4)
     } else if (def.accentColor === 'stripe') {
-      ctx.fillStyle = '#0a0a0a'; ctx.fillRect(-w / 2, -1.5, w, 1.5)
+      ctx.fillStyle = '#0a0a0a'; ctx.fillRect(-hw, -1.5, w, 1.5)
     }
 
-    // Windows
+    // Cabin / roof — slightly lighter than body, sits between the windows
+    const roofColor =
+      def.color === '#1a1a1a' ? '#222226'
+      : def.color === '#fcd00b' ? '#d8af0a'
+      : '#dcdcd6'
+    ctx.fillStyle = roofColor
+    ctx.fillRect(-hw + 2, nose_y + 22, w - 4, h - 38)
+    // Subtle side stripes inside the roof slab
+    ctx.fillStyle = 'rgba(0,0,0,0.10)'
+    ctx.fillRect(-hw, nose_y + 22, 1.5, h - 38)
+    ctx.fillRect(hw - 1.5, nose_y + 22, 1.5, h - 38)
+    // Cut-line at the door pillars
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)'
+    ctx.lineWidth = 0.6
+    ctx.beginPath(); ctx.moveTo(-hw + 2, -3); ctx.lineTo(hw - 2, -3)
+    ctx.moveTo(-hw + 2, 3); ctx.lineTo(hw - 2, 3); ctx.stroke()
+
+    // Front windscreen — wide near the roof, narrows toward the bonnet
     ctx.fillStyle = 'rgba(15,18,28,0.92)'
     ctx.beginPath()
-    ctx.moveTo(-w / 2 + 3, -h / 2 + 13)
-    ctx.lineTo(w / 2 - 3, -h / 2 + 13)
-    ctx.lineTo(w / 2 - 4, -h / 2 + 22)
-    ctx.lineTo(-w / 2 + 4, -h / 2 + 22)
-    ctx.closePath()
-    ctx.fill()
+    ctx.moveTo(-hw + 3, nose_y + 13)
+    ctx.lineTo(hw - 3,  nose_y + 13)
+    ctx.lineTo(hw - 4,  nose_y + 22)
+    ctx.lineTo(-hw + 4, nose_y + 22)
+    ctx.closePath(); ctx.fill()
+    // Rear screen — wide near the roof, narrows toward the boot
     ctx.beginPath()
-    ctx.moveTo(-w / 2 + 4, h / 2 - 16)
-    ctx.lineTo(w / 2 - 4, h / 2 - 16)
-    ctx.lineTo(w / 2 - 3, h / 2 - 8)
-    ctx.lineTo(-w / 2 + 3, h / 2 - 8)
-    ctx.closePath()
-    ctx.fill()
+    ctx.moveTo(-hw + 4, tail_y - 16)
+    ctx.lineTo(hw - 4,  tail_y - 16)
+    ctx.lineTo(hw - 3,  tail_y - 8)
+    ctx.lineTo(-hw + 3, tail_y - 8)
+    ctx.closePath(); ctx.fill()
 
-    // Wheels
-    let wheelColor = '#dcdcd6'
-    if (def.color === '#1a1a1a') wheelColor = '#0e0e0e'
-    if (def.color === '#fcd00b') wheelColor = '#d8af0a'
-    ctx.fillStyle = wheelColor
-    // Rear left, rear right, front left, front right
+    // Headlights at the nose. RX-7 is one wide strip; everyone else gets pods.
+    if (def.id === 'rx7') {
+      ctx.fillStyle = '#fff8c0'
+      ctx.fillRect(-hw + 2, nose_y + 1, hw - 3, 2.5)
+      ctx.fillRect(1,       nose_y + 1, hw - 3, 2.5)
+    } else {
+      ctx.fillStyle = '#fff8c0'
+      ctx.fillRect(-hw + 2,  nose_y + 1, 4.5, 3)
+      ctx.fillRect(-hw + 7,  nose_y + 1, 3.5, 2.5)
+      ctx.fillRect(hw - 6.5, nose_y + 1, 4.5, 3)
+      ctx.fillRect(hw - 10.5, nose_y + 1, 3.5, 2.5)
+      // Kidney grille / nose badge
+      ctx.fillStyle = '#0a0a0a'
+      ctx.fillRect(-3, nose_y + 1, 6, 3.5)
+    }
+
+    // Tail-lights — red strip with orange indicator corners
+    ctx.fillStyle = '#cc0a16'
+    ctx.fillRect(-hw + 2, tail_y - 4, w - 4, 2.5)
+    ctx.fillStyle = '#ffae00'
+    ctx.fillRect(-hw + 2, tail_y - 4, 3, 2.5)
+    ctx.fillRect(hw - 5,  tail_y - 4, 3, 2.5)
+
+    // Wheels — black with a thin rim outline.
+    // FRONT wheels rotate by this.steer (the actual steered angle in radians).
+    // REAR wheels stay aligned with the body.
     const ww = 5, wh = 9
-    const rl = -this.Lr
-    const fl = this.Lf
-    const hw2 = w / 2
-    ctx.fillRect(-hw2 - 3, rl - wh / 2, ww, wh)
-    ctx.fillRect(hw2 - 2, rl - wh / 2, ww, wh)
-    ctx.save()
-    ctx.translate(-hw2 - 3, fl - wh / 2)
-    ctx.rotate(this.steer)
-    ctx.fillRect(-1, -wh / 2, ww, wh)
-    ctx.restore()
-    ctx.save()
-    ctx.translate(hw2 - 2, fl - wh / 2)
-    ctx.rotate(this.steer)
-    ctx.fillRect(-1, -wh / 2, ww, wh)
-    ctx.restore()
+    const drawWheel = (cx: number, cy: number, rot: number) => {
+      ctx.save()
+      ctx.translate(cx, cy)
+      if (rot) ctx.rotate(rot)
+      ctx.fillStyle = '#0a0a0a'
+      ctx.fillRect(-ww / 2, -wh / 2, ww, wh)
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)'
+      ctx.lineWidth = 0.6
+      ctx.strokeRect(-ww / 2, -wh / 2, ww, wh)
+      // Hub cap
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'
+      ctx.beginPath(); ctx.arc(0, 0, 1.2, 0, TWO_PI); ctx.fill()
+      ctx.restore()
+    }
+    drawWheel(-hw - 1, front_y, this.steer)
+    drawWheel( hw + 1, front_y, this.steer)
+    drawWheel(-hw - 1, rear_y,  0)
+    drawWheel( hw + 1, rear_y,  0)
 
     ctx.restore()
   }

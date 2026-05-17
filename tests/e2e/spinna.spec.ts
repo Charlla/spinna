@@ -15,34 +15,44 @@ function extractSpeed(hud: string): number {
 }
 
 test.describe.serial('Spinna smoke', () => {
-  test('landing page loads and has Spin button', async ({ page }) => {
+  test('garage opens on step 1 (Pick your ride)', async ({ page }) => {
     await page.goto('/')
-    await expect(page.getByRole('button', { name: /SPIN/i })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/Pick your ride/i)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/Your stable/i)).toBeVisible()
     await expect(page.getByText(/BMW E30/)).toBeVisible()
   })
 
-  test('cars and tires render in garage', async ({ page }) => {
+  test('sequential flow: pick car → pick tyres → SPIN button appears', async ({ page }) => {
     await page.goto('/')
-    await expect(page.getByText(/BMW E30/)).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByText(/BMW E36/)).toBeVisible()
-    await expect(page.getByText(/RX-7/)).toBeVisible()
+    // Step 1
+    await expect(page.getByText(/Pick your ride/i)).toBeVisible({ timeout: 15_000 })
+    // Click the owned E30 row
+    await page.getByText('BMW E30 325i').click()
+    // Step 2 — tyres
+    await expect(page.getByText(/Mount your tyres/i)).toBeVisible({ timeout: 5_000 })
     await expect(page.getByText(/BUDGET ALL-SEASON/)).toBeVisible()
+    await page.getByText('BUDGET ALL-SEASON').click()
+    // Step 3 — confirm
+    await expect(page.getByText(/Ready to spin/i)).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByRole('button', { name: /SPIN/i })).toBeVisible()
   })
 
-  test('guest can play without signing in', async ({ page }) => {
-    // No cookie / no session — landing should still let you play.
+  test('guest can run through the flow without signing in', async ({ page }) => {
     await page.goto('/')
-    // Sign-in nudge appears for guests.
     await expect(page.getByText(/Sign in to save scores/i)).toBeVisible({ timeout: 5_000 })
+    await page.getByText('BMW E30 325i').click()
+    await page.getByText('BUDGET ALL-SEASON').click()
     await page.getByRole('button', { name: /SPIN/i }).click()
     await page.waitForURL(/\/game/, { timeout: 5_000 })
     await expect(page.locator('canvas').first()).toBeVisible({ timeout: 10_000 })
   })
 
-  test('click SPIN navigates to /game and canvas renders', async ({ page }) => {
+  test('SPIN navigates to /game and canvas renders', async ({ page }) => {
     await page.goto('/')
+    await page.getByText('BMW E30 325i').click()
+    await page.getByText('BUDGET ALL-SEASON').click()
     await page.getByRole('button', { name: /SPIN/i }).click()
-    await page.waitForURL(/\/game/, { timeout: 5000 })
+    await page.waitForURL(/\/game/, { timeout: 5_000 })
     const canvas = page.locator('canvas')
     await expect(canvas.first()).toBeVisible({ timeout: 10_000 })
     const box = await canvas.first().boundingBox()
