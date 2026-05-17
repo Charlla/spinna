@@ -266,6 +266,18 @@ export default function SpinnaGarage({ save, onSave, onPlay, player, onLogin, on
         <div className="flex gap-4 justify-center text-[10px] font-mono text-white/40">
           <a href="/leaderboard" className="hover:text-amber-300 transition">LEADERBOARD</a>
         </div>
+
+        {/* Guest hint */}
+        {!player && (
+          <div className="mt-4 text-center">
+            <a
+              href="/auth/login"
+              className="text-[10px] font-mono text-white/35 hover:text-amber-300 transition"
+            >
+              Sign in to save scores →
+            </a>
+          </div>
+        )}
       </div>
     </main>
   )

@@ -1,14 +1,23 @@
 /**
  * Spinna E2E smoke tests.
- * Verifies landing → garage → game flow + keyboard controls actually drive the car.
+ * Verifies the restored original UI:
+ *   - Garage → SPIN → game canvas
+ *   - Keyboard + on-screen joystick / sticky throttle controls
+ *   - TUNE side panel opens, edits persist
+ *   - Guest play works (no login required)
  */
 import { test, expect } from '@playwright/test'
+
+// HUD shows "<speed> KM/H" — strip whitespace then look for digits followed by km/h.
+function extractSpeed(hud: string): number {
+  const m = hud.match(/(\d+)\s*km\/h/i)
+  return m ? parseInt(m[1], 10) : 0
+}
 
 test.describe.serial('Spinna smoke', () => {
   test('landing page loads and has Spin button', async ({ page }) => {
     await page.goto('/')
     await expect(page.getByRole('button', { name: /SPIN/i })).toBeVisible({ timeout: 15_000 })
-    // E30 BMW should be the default/selected car
     await expect(page.getByText(/BMW E30/)).toBeVisible()
   })
 
@@ -20,67 +29,124 @@ test.describe.serial('Spinna smoke', () => {
     await expect(page.getByText(/BUDGET ALL-SEASON/)).toBeVisible()
   })
 
+  test('guest can play without signing in', async ({ page }) => {
+    // No cookie / no session — landing should still let you play.
+    await page.goto('/')
+    // Sign-in nudge appears for guests.
+    await expect(page.getByText(/Sign in to save scores/i)).toBeVisible({ timeout: 5_000 })
+    await page.getByRole('button', { name: /SPIN/i }).click()
+    await page.waitForURL(/\/game/, { timeout: 5_000 })
+    await expect(page.locator('canvas').first()).toBeVisible({ timeout: 10_000 })
+  })
+
   test('click SPIN navigates to /game and canvas renders', async ({ page }) => {
     await page.goto('/')
     await page.getByRole('button', { name: /SPIN/i }).click()
     await page.waitForURL(/\/game/, { timeout: 5000 })
     const canvas = page.locator('canvas')
     await expect(canvas.first()).toBeVisible({ timeout: 10_000 })
-    // Canvas should have non-zero size
     const box = await canvas.first().boundingBox()
     expect(box?.width ?? 0).toBeGreaterThan(100)
     expect(box?.height ?? 0).toBeGreaterThan(100)
+  })
+
+  test('HUD shows score / bank / km-h chips and CASH+TUNE buttons', async ({ page }) => {
+    await page.goto('/game')
+    await expect(page.locator('canvas').first()).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('SCORE', { exact: true })).toBeVisible()
+    await expect(page.getByText('BANK', { exact: true })).toBeVisible()
+    await expect(page.getByText('KM/H', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Cash out/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Open tuning panel/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Exit to garage/i })).toBeVisible()
+  })
+
+  test('on-screen joystick and throttle controls render', async ({ page }) => {
+    await page.goto('/game')
+    await expect(page.locator('canvas').first()).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('slider', { name: 'Steering' })).toBeVisible()
+    await expect(page.getByRole('slider', { name: 'Throttle' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Handbrake' })).toBeVisible()
+  })
+
+  test('TUNE panel opens, sliders work, and values persist to localStorage', async ({ page }) => {
+    await page.goto('/game')
+    await expect(page.locator('canvas').first()).toBeVisible({ timeout: 10_000 })
+    await page.getByRole('button', { name: /Open tuning panel/i }).click()
+    const dialog = page.getByRole('dialog', { name: 'Tune panel' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByText('Engine Power')).toBeVisible()
+    await expect(dialog.getByText('Spin Threshold')).toBeVisible()
+
+    // Tweak one slider then confirm localStorage has it.
+    const slider = dialog.getByRole('slider', { name: 'Engine Power' })
+    await slider.evaluate((el: HTMLInputElement) => {
+      el.value = '2.10'
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+      el.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+
+    const stored = await page.evaluate(() => localStorage.getItem('spinna_tune_v3'))
+    expect(stored).toBeTruthy()
+    const parsed = JSON.parse(stored!) as { enginePower: number }
+    expect(parsed.enginePower).toBeCloseTo(2.10, 1)
+
+    // Reset button restores defaults (enginePower → 1.55)
+    await dialog.getByRole('button', { name: /RESET TO DEFAULTS/i }).click()
+    const stored2 = await page.evaluate(() => localStorage.getItem('spinna_tune_v3'))
+    const parsed2 = JSON.parse(stored2!) as { enginePower: number }
+    expect(parsed2.enginePower).toBeCloseTo(1.55, 2)
+  })
+
+  test('throttle slider sticks at tapped position', async ({ page }) => {
+    await page.goto('/game')
+    const throttle = page.getByRole('slider', { name: 'Throttle' })
+    await expect(throttle).toBeVisible({ timeout: 10_000 })
+
+    const box = await throttle.boundingBox()
+    expect(box).not.toBeNull()
+    if (!box) return
+
+    // Tap near the top (≈ full forward) then release. Slider must hold the value.
+    const x = box.x + box.width / 2
+    const y = box.y + 30
+    await page.mouse.move(x, y)
+    await page.mouse.down()
+    await page.mouse.up()
+    await page.waitForTimeout(300)
+
+    const valueNow = await throttle.getAttribute('aria-valuenow')
+    expect(valueNow).not.toBeNull()
+    const v = parseFloat(valueNow!)
+    expect(v).toBeGreaterThan(0.4) // stuck near forward
   })
 
   test('keyboard W triggers throttle (speed increases above 0)', async ({ page }) => {
     await page.goto('/game')
     const canvas = page.locator('canvas').first()
     await expect(canvas).toBeVisible({ timeout: 10_000 })
-
-    // Wait a frame for engine to init
     await page.waitForTimeout(800)
-
-    // Click body to ensure focus
     await page.locator('body').click({ position: { x: 5, y: 5 } })
 
-    // Probe the inputs ref directly via the document - first verify our keydown reaches
-    await page.evaluate(() => {
-      ;(window as unknown as { __keyEvents: string[] }).__keyEvents = []
-      window.addEventListener('keydown', e => {
-        ;(window as unknown as { __keyEvents: string[] }).__keyEvents.push(`${e.key}/${e.code}`)
-      })
-    })
-
-    // Hold W for ~2s
     await page.keyboard.down('w')
     await page.waitForTimeout(2200)
+    const hudText = await page.locator('body').innerText()
     await page.keyboard.up('w')
 
-    const keyEvents = await page.evaluate(() => (window as unknown as { __keyEvents: string[] }).__keyEvents)
-    console.log('Key events fired:', keyEvents)
-
-    // Get HUD text BEFORE releasing
-    // HUD layout: "KM/H <number>" — label first, then value
-    const hudText = await page.locator('body').innerText()
-    const speedMatch = hudText.match(/km\/h\s*(\d+)/i)
-    const speed = speedMatch ? parseInt(speedMatch[1], 10) : 0
-
-    console.log('Detected speed:', speed, '| HUD:', hudText.substring(0, 300).replace(/\s+/g, ' '))
+    const speed = extractSpeed(hudText)
+    console.log('Detected speed:', speed)
     expect(speed).toBeGreaterThan(10)
   })
 
-  test('handbrake (Space) + steering triggers a spin (combo degrees accumulate)', async ({ page }) => {
+  test('handbrake (Space) + steering keeps car moving', async ({ page }) => {
     await page.goto('/game')
     const canvas = page.locator('canvas').first()
     await expect(canvas).toBeVisible({ timeout: 10_000 })
     await page.waitForTimeout(800)
     await page.locator('body').click({ position: { x: 5, y: 5 } })
 
-    // Accelerate first
     await page.keyboard.down('w')
     await page.waitForTimeout(1500)
-
-    // Then handbrake + hard left to break the rear loose
     await page.keyboard.down(' ')
     await page.keyboard.down('a')
     await page.waitForTimeout(2500)
@@ -90,10 +156,22 @@ test.describe.serial('Spinna smoke', () => {
     await page.keyboard.up(' ')
     await page.keyboard.up('a')
 
-    // After a spin attempt, comboDeg should be > 0 OR sessionTotalSpins > 0 OR speed > 30
-    const speed = parseInt(hudText.match(/km\/h\s*(\d+)/i)?.[1] ?? '0', 10)
-    console.log('After spin attempt: speed =', speed, '| HUD:', hudText.substring(0, 300).replace(/\s+/g, ' '))
+    const speed = extractSpeed(hudText)
     expect(speed).toBeGreaterThan(10)
+  })
+
+  test('login page loads with guest fallback link', async ({ page }) => {
+    await page.goto('/auth/login')
+    await expect(page.getByRole('button', { name: /LOGIN/i })).toBeVisible()
+    await expect(page.getByRole('link', { name: /Play as guest/i })).toBeVisible()
+    await expect(page.getByRole('link', { name: /Register/i })).toBeVisible()
+  })
+
+  test('register page loads with guest fallback link', async ({ page }) => {
+    await page.goto('/auth/register')
+    await expect(page.getByRole('button', { name: /JOIN/i })).toBeVisible()
+    await expect(page.getByRole('link', { name: /Play as guest/i })).toBeVisible()
+    await expect(page.getByRole('link', { name: /Login/i })).toBeVisible()
   })
 
   test('leaderboard page loads', async ({ page }) => {

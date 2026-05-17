@@ -3,10 +3,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
+import Link from 'next/link'
 import SpinnaHud from '@/components/spinna-hud'
 import SpinnaControls from '@/components/spinna-controls'
+import SpinnaTunePanel from '@/components/spinna-tune-panel'
 import { SpinnaCanvasHandle } from '@/components/spinna-canvas'
-import { SAVE_KEY, DEFAULT_SAVE, DEFAULT_TUNE, SaveData, TuneData, GameStats } from '@/lib/spinna-data'
+import { SAVE_KEY, TUNE_KEY, DEFAULT_SAVE, DEFAULT_TUNE, SaveData, TuneData, GameStats } from '@/lib/spinna-data'
 
 // Load canvas client-side only (uses browser APIs)
 const SpinnaCanvas = dynamic(() => import('@/components/spinna-canvas'), { ssr: false })
@@ -25,6 +27,8 @@ export default function GamePage() {
   const canvasRef = useRef<SpinnaCanvasHandle>(null)
   const inputsRef = useRef<{ throttle: number; steer: number; hbrk: boolean }>({ throttle: 0, steer: 0, hbrk: false })
   const tuneRef = useRef<TuneData>({ ...DEFAULT_TUNE })
+  const [tune, setTune] = useState<TuneData>({ ...DEFAULT_TUNE })
+  const [tuneOpen, setTuneOpen] = useState(false)
   const [save, setSave] = useState<SaveData>({ ...DEFAULT_SAVE })
   const [view, setView] = useState<'play' | 'results'>('play')
   const [stats, setStats] = useState<GameStats>({
@@ -33,15 +37,14 @@ export default function GamePage() {
   })
   const [banner, setBanner] = useState({ key: 0, text: '', sub: '', color: '#fcd00b' })
   const [result, setResult] = useState<GameResult | null>(null)
-  const [resetKey, setResetKey] = useState(0)
+  const [resetKey] = useState(0)
   const [started, setStarted] = useState(false)
   const [player, setPlayer] = useState<{ username: string } | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
 
-  // Load save + player
+  // Load save + tune + player
   useEffect(() => {
-    // Load save from session (passed from garage)
     try {
       const raw = sessionStorage.getItem('spinna_game_save') ?? localStorage.getItem(SAVE_KEY)
       if (raw) {
@@ -50,7 +53,16 @@ export default function GamePage() {
       }
     } catch { /* ignore */ }
 
-    // Check auth
+    try {
+      const tRaw = localStorage.getItem(TUNE_KEY)
+      if (tRaw) {
+        const parsed = JSON.parse(tRaw)
+        const merged: TuneData = { ...DEFAULT_TUNE, ...parsed }
+        setTune(merged)
+        tuneRef.current = merged
+      }
+    } catch { /* ignore */ }
+
     fetch('/api/auth/me')
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data?.player) setPlayer(data.player) })
@@ -79,7 +91,6 @@ export default function GamePage() {
       if (canvasRef.current?.isRunning()) {
         setStats(canvasRef.current.getStats())
       } else if (started) {
-        // Tires popped — auto cash out
         const st = canvasRef.current?.getStats() ?? stats
         handleEnd(st, 'tires')
         return
@@ -96,7 +107,6 @@ export default function GamePage() {
     const payout = finalStats.score
     const newBest = payout > save.bestPayout
 
-    // Update local save
     const newSave: SaveData = {
       ...save,
       money: save.money + payout,
@@ -139,6 +149,16 @@ export default function GamePage() {
     setBanner(prev => ({ key: prev.key + 1, text, sub, color }))
   }, [])
 
+  const handleTuneChange = useCallback((next: TuneData) => {
+    setTune(next)
+    tuneRef.current = next
+  }, [])
+
+  // Original v0 behavior: tune panel is a live side-sheet — physics keeps running
+  // so the player can feel each knob change immediately.
+  const openTune = useCallback(() => setTuneOpen(true), [])
+  const closeTune = useCallback(() => setTuneOpen(false), [])
+
   const handleSubmitScore = useCallback(async () => {
     if (!result || !player || submitting || submitted) return
     setSubmitting(true)
@@ -179,9 +199,16 @@ export default function GamePage() {
             bannerSub={banner.sub}
             bannerColor={banner.color}
             onCashOut={handleCashOut}
+            onTune={openTune}
             onExit={handleExit}
           />
           <SpinnaControls inputsRef={inputsRef} resetKey={resetKey} />
+          <SpinnaTunePanel
+            open={tuneOpen}
+            tune={tune}
+            onChange={handleTuneChange}
+            onClose={closeTune}
+          />
         </>
       )}
 
@@ -220,7 +247,6 @@ function ResultsScreen({
   return (
     <div className="flex min-h-dvh items-center justify-center px-4 bg-[#0a0807]">
       <div className="w-full max-w-sm">
-        {/* Reason */}
         <div className="text-center mb-4">
           <div
             className="font-mono font-black text-2xl tracking-widest"
@@ -230,7 +256,6 @@ function ResultsScreen({
           </div>
         </div>
 
-        {/* Payout */}
         <div className="mt-4 rounded-lg border border-white/10 bg-black/55 backdrop-blur-md p-5">
           <div className="text-center">
             <div className="text-[9px] tracking-[3px] font-mono text-white/55">PAYOUT</div>
@@ -251,7 +276,6 @@ function ResultsScreen({
           </div>
         </div>
 
-        {/* Submit score */}
         {player && !submitted && (
           <button
             onClick={onSubmit}
@@ -262,8 +286,10 @@ function ResultsScreen({
           </button>
         )}
         {!player && (
-          <div className="mt-4 text-center text-[10px] font-mono text-white/40">
-            Login from garage to submit scores to the leaderboard.
+          <div className="mt-4 text-center text-[11px] font-mono text-white/55">
+            <Link href="/auth/login" className="text-amber-300 hover:text-amber-200 transition">
+              Sign in to save your score →
+            </Link>
           </div>
         )}
         {submitted && (
