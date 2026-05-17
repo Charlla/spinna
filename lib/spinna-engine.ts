@@ -277,7 +277,10 @@ export class CarPhysics {
     // Tire wear
     const slipFactor = (+(Math.abs(this.slipAngleF) > 0.05) * Math.abs(slipLong) * 0.55 +
       0.7 * clamp(1.3 * Math.abs(this.slipAngleR), 0, 1.6)) * this.tireDef.wearMul
-    this.tireHealth -= 7 * slipFactor * tune.wearRate * dt / (this.tireDef.durability / 500)
+    // Wear coefficient was 7 in the original; lowered to 4.5 so a round
+    // lasts comfortably long. The HUD bar now also shows one decimal place,
+    // so each frame's tiny drop is visible (was Math.round → looked static).
+    this.tireHealth -= 4.5 * slipFactor * tune.wearRate * dt / (this.tireDef.durability / 500)
     this.tireHealth = Math.max(0, this.tireHealth)
 
     this.v_fwd = v_fwd

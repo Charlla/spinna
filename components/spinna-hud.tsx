@@ -104,7 +104,7 @@ export default function SpinnaHud({
       <div className="pointer-events-none absolute top-[calc(max(env(safe-area-inset-top),12px)+78px)] left-3 right-3 z-10">
         <div className="relative h-[14px] rounded-[2px] overflow-hidden border border-white/10 bg-black/55 backdrop-blur-md">
           <div
-            className="absolute left-0 top-0 bottom-0 transition-[width] duration-100"
+            className="absolute left-0 top-0 bottom-0"
             style={{
               width: `${tireH}%`,
               background: 'linear-gradient(90deg,#22c55e 0%,#fcd00b 60%,#ff2d2d 100%)',
@@ -117,7 +117,7 @@ export default function SpinnaHud({
             >
               {popped ? 'TIRES POPPED — CASH OUT!' : stats.tireName}
             </span>
-            <span className="text-white/85 tabular-nums">{Math.round(tireH)}%</span>
+            <span className="text-white/85 tabular-nums">{tireH.toFixed(1)}%</span>
           </div>
         </div>
       </div>

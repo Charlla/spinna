@@ -12,7 +12,9 @@ import {
 } from '@/lib/spinna-engine'
 import { CARS, TIRES, DEFAULT_TUNE, TuneData, GameStats } from '@/lib/spinna-data'
 
-const CANVAS_DISPLAY = 750
+// World is 1500x1500. Camera viewport = CANVAS_DISPLAY world units → fills
+// the on-screen canvas element. Smaller value = closer zoom / bigger car.
+const CANVAS_DISPLAY = 525
 const WORLD_SIZE = 1500
 
 interface SpinnaCanvasProps {
