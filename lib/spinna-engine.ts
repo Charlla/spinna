@@ -163,12 +163,18 @@ export class CarPhysics {
     let slipLong = (this.wheelLinSpeed - v_fwd) / wheelSpd
     slipLong = clamp(slipLong, -2.5, 2.5)
 
-    // Slip limit
+    // Slip limit.
+    // Below spinThrottle: maxSlip stays low so the rear tyres maintain traction —
+    //   curve is quadratic so light throttle is very gentle, then ramps up.
+    // At/above spinThrottle: maxSlip jumps to 2.5 so torque-induced wheelspin
+    //   is allowed (high-power cars overpower their grip, breaking the rear loose
+    //   even on a straight). This is the "boot it and the rear steps out" feel.
     let maxSlip = 2.5
     if (!hbrk) {
       if (throttle < 0) maxSlip = 0.18
       else if (throttle < tune.spinThrottle) {
-        maxSlip = lerp(0.14, 0.95, clamp(throttle / tune.spinThrottle, 0, 1))
+        const ratio = clamp(throttle / tune.spinThrottle, 0, 1)
+        maxSlip = lerp(0.10, 0.70, ratio * ratio)   // quadratic — gentle low, sharp knee at the threshold
       }
     }
     if (Math.abs(slipLong) > maxSlip) {
