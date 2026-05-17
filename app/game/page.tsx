@@ -35,6 +35,7 @@ export default function GamePage() {
     score: 0, comboDeg: 0, mult: 1, speedKmh: 0,
     tireHealth: 100, tireName: '', totalSpins: 0, maxCombo: 0,
     damageBumps: 0, damagePenalty: 0, lastBumpCost: 0,
+    mode: 'free', targetsHit: 0, targetsTotal: 0, targetProgress: 0,
   })
   const [banner, setBanner] = useState({ key: 0, text: '', sub: '', color: '#fcd00b' })
   const [result, setResult] = useState<GameResult | null>(null)
@@ -43,6 +44,8 @@ export default function GamePage() {
   const [player, setPlayer] = useState<{ username: string } | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+
+  const [loaded, setLoaded] = useState(false)
 
   // Load save + tune + player
   useEffect(() => {
@@ -68,21 +71,29 @@ export default function GamePage() {
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data?.player) setPlayer(data.player) })
       .catch(() => {})
+
+    setLoaded(true)
   }, [])
 
-  // Start game once canvas is ready
+  // Start game once the save has been hydrated AND the canvas is ready.
+  // Previously the start poll fired on the first render with DEFAULT_SAVE before
+  // the load effect set the saved track — the stale closure then called start()
+  // with track='donut' even when the user had picked another. Wait for `loaded`.
   useEffect(() => {
-    if (started) return
+    if (started || !loaded) return
+    let cancelled = false
     const tryStart = () => {
+      if (cancelled) return
       if (canvasRef.current) {
-        canvasRef.current.start(save.car, save.tires, save.tireHealth, save.track ?? 'donut')
+        canvasRef.current.start(save.car, save.tires, save.tireHealth, save.track ?? 'donut', save.mode ?? 'free')
         setStarted(true)
       } else {
         setTimeout(tryStart, 100)
       }
     }
     tryStart()
-  }, [save.car, save.tires, save.tireHealth, started])
+    return () => { cancelled = true }
+  }, [save.car, save.tires, save.tireHealth, save.track, started, loaded])
 
   // HUD update loop
   useEffect(() => {

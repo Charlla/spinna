@@ -150,6 +150,27 @@ export default function SpinnaHud({
         </div>
       )}
 
+      {/* ── Target Hunt: bonus rings progress ──────────────────────────── */}
+      {stats.mode === 'targets' && stats.targetsTotal > 0 && (
+        <div className="pointer-events-none absolute top-[calc(max(env(safe-area-inset-top),12px)+136px)] left-3 z-10">
+          <div className="text-[8px] tracking-[2px] font-mono text-emerald-400/80">RINGS</div>
+          <div className="text-[11px] font-mono text-emerald-300 tabular-nums">
+            {stats.targetsHit}/{stats.targetsTotal}
+            <span className="text-white/40"> · </span>
+            <span className="tabular-nums">{Math.round(stats.targetProgress * 100)}%</span>
+          </div>
+          <div className="mt-1 h-1 w-24 rounded-full bg-white/10 overflow-hidden">
+            <div
+              className="h-full"
+              style={{
+                width: `${stats.targetProgress * 100}%`,
+                background: '#22c55e',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* ── Milestone banner ────────────────────────────────────────────── */}
       <div
         key={bannerKey}

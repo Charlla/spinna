@@ -9,6 +9,7 @@ import {
   initAudio, resumeAudio, updateAudio, playBoom,
   Particle,
   ScoreState,
+  Target, makeTargetSet, updateTargets, drawTargets,
 } from '@/lib/spinna-engine'
 import { CARS, TIRES, DEFAULT_TUNE, TuneData, GameStats } from '@/lib/spinna-data'
 
@@ -26,7 +27,7 @@ interface SpinnaCanvasProps {
 }
 
 export interface SpinnaCanvasHandle {
-  start: (carId: string, tireId: string, tireHealth: number, trackId?: string) => void
+  start: (carId: string, tireId: string, tireHealth: number, trackId?: string, mode?: string) => void
   stop: () => void
   isRunning: () => boolean
   getStats: () => GameStats
@@ -54,6 +55,9 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
       excitement: number
       lastBumpAt: number
       lastBumpCost: number
+      mode: string
+      targets: Target[]
+      targetsBanked: number
     }>({
       car: null,
       cones: [],
@@ -73,10 +77,13 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
       excitement: 0,
       lastBumpAt: 0,
       lastBumpCost: 0,
+      mode: 'free',
+      targets: [],
+      targetsBanked: 0,
     })
 
     useImperativeHandle(ref, () => ({
-      start(carId: string, tireId: string, tireHealth: number, trackId: string = 'donut') {
+      start(carId: string, tireId: string, tireHealth: number, trackId: string = 'donut', mode: string = 'free') {
         const carDef = CARS.find(c => c.id === carId) ?? CARS[0]
         const tireDef = TIRES.find(t => t.id === tireId) ?? TIRES[1]
         const s = stateRef.current
@@ -86,6 +93,11 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
           const fctx = s.floorCanvas.getContext('2d')
           if (fctx) drawFloor(fctx, trackId)
         }
+
+        // Mode-specific setup
+        s.mode = mode
+        s.targets = mode === 'targets' ? makeTargetSet() : []
+        s.targetsBanked = 0
 
         s.car = new CarPhysics(carDef, tireDef, tireHealth)
         s.car.onBounce = () => {
@@ -132,8 +144,9 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
         const s = stateRef.current
         const car = s.car
         const now = performance.now()
-        // lastBumpCost surfaces for 1s after a bump so the HUD can pop it.
         const lastBumpCost = (s.lastBumpAt && now - s.lastBumpAt < 1000) ? s.lastBumpCost : 0
+        const activeTarget = s.targets.find(t => !t.hit)
+        const targetProgress = activeTarget ? Math.min(1, activeTarget.accumulatedDeg / 330) : 0
         return {
           score: s.score.score,
           comboDeg: s.score.comboDeg,
@@ -146,6 +159,10 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
           damageBumps: s.score.damageBumps,
           damagePenalty: s.score.damagePenalty,
           lastBumpCost,
+          mode: s.mode,
+          targetsHit: s.targetsBanked,
+          targetsTotal: s.targets.length,
+          targetProgress,
         }
       },
     }), [inputsRef])
@@ -252,6 +269,35 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
           cone.collideWith(car, s.sparks)
         }
 
+        // Targets (Target Hunt mode only)
+        if (s.mode === 'targets' && s.targets.length > 0) {
+          updateTargets(s.targets, car, dt, (target) => {
+            s.targetsBanked += 1
+            s.score.score += 4500
+            // Fire a milestone banner via the onBanner callback below; we can
+            // hijack it here since we have the ref. But we don't — the parent
+            // handles banners through updateScore. Simplest: temporarily set
+            // a synthetic milestone by directly invoking onBanner via state.
+            onBanner('RING!', `+R4500 · ${s.targetsBanked}/${s.targets.length}`, '#22c55e')
+            // small particle burst at the ring
+            for (let i = 0; i < 18; i++) {
+              const a = Math.random() * Math.PI * 2
+              const sp = 90 + Math.random() * 120
+              s.sparks.push({
+                x: target.x, y: target.y,
+                vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+                r: 2 + Math.random() * 2,
+                life: 0.5 + Math.random() * 0.5, maxLife: 1,
+                alpha: 1, color: '34,197,94',
+              })
+            }
+          })
+          // Re-spawn a fresh trio when all banked
+          if (s.targets.every(t => t.hit)) {
+            s.targets = makeTargetSet()
+          }
+        }
+
         // Camera shake
         s.shakeAmp = Math.max(0, s.shakeAmp - 18 * dt)
       }
@@ -296,6 +342,12 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
       // Tire marks
       if (s.tireCanvas) {
         ctx.drawImage(s.tireCanvas, 0, 0)
+      }
+
+      // Target rings (Target Hunt mode) — drawn below the car so it can dip
+      // into them visually as it spins around.
+      if (s.mode === 'targets' && s.targets.length > 0) {
+        drawTargets(ctx, s.targets)
       }
 
       // Smoke (behind car)

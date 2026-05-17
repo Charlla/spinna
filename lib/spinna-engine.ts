@@ -440,6 +440,116 @@ export class CarPhysics {
   }
 }
 
+// ─── Target rings (Target Hunt game mode) ───────────────────────────────────
+// Each target is a glowing ring on the arena floor. The player banks it by
+// completing a near-full circle (≥330° of rotation) while inside its capture
+// radius. Once banked, the target disappears, awards bonus points, and a new
+// set spawns when all are cleared.
+export interface Target {
+  x: number
+  y: number
+  r: number          // visual ring radius
+  captureR: number   // car must stay within this distance
+  accumulatedDeg: number  // |Δheading| while car was inside
+  hit: boolean
+  phase: number      // for shimmer animation
+}
+
+const TARGET_GOAL_DEG = 330  // ~one full lap to bank a target
+const TARGET_BONUS_POINTS = 4500
+
+export function makeTargetSet(): Target[] {
+  // Three rings on a randomised pattern, kept well inside the arena.
+  const A = ARENA
+  const margin = 220
+  const positions: Array<[number, number]> = []
+  for (let i = 0; i < 3; i++) {
+    let tries = 0
+    while (tries++ < 20) {
+      const x = A.l + margin + Math.random() * (A.r - A.l - margin * 2)
+      const y = A.t + margin + Math.random() * (A.b - A.t - margin * 2)
+      // keep them apart from each other and from the car spawn (CarPhysics.START_X/Y)
+      const sx = CarPhysics.START_X, sy = CarPhysics.START_Y
+      if (Math.hypot(x - sx, y - sy) < 220) continue
+      let ok = true
+      for (const [px, py] of positions) {
+        if (Math.hypot(x - px, y - py) < 280) { ok = false; break }
+      }
+      if (ok) { positions.push([x, y]); break }
+    }
+  }
+  return positions.map(([x, y]) => ({
+    x, y, r: 70, captureR: 110, accumulatedDeg: 0, hit: false, phase: Math.random() * TWO_PI,
+  }))
+}
+
+export function updateTargets(
+  targets: Target[],
+  car: CarPhysics,
+  dt: number,
+  onBank: (t: Target) => void,
+): void {
+  for (const t of targets) {
+    t.phase += dt * 2.2
+    if (t.hit) continue
+    const dx = car.x - t.x
+    const dy = car.y - t.y
+    const inside = dx * dx + dy * dy < t.captureR * t.captureR
+    if (inside) {
+      // accumulate yaw while inside, scaled by |omega| so it must be a real spin
+      const yaw = Math.abs(car.omega * dt) * (180 / Math.PI)
+      // only count when the rear is sliding (otherwise just driving in circles is too easy)
+      if (Math.abs(car.slipAngleR) > 0.18) {
+        t.accumulatedDeg += yaw
+        if (t.accumulatedDeg >= TARGET_GOAL_DEG) {
+          t.hit = true
+          onBank(t)
+        }
+      }
+    } else if (t.accumulatedDeg > 0) {
+      // decay when the car drifts away
+      t.accumulatedDeg = Math.max(0, t.accumulatedDeg - 60 * dt)
+    }
+  }
+}
+
+export function drawTargets(ctx: CanvasRenderingContext2D, targets: Target[]) {
+  for (const t of targets) {
+    if (t.hit) continue
+    const progress = Math.min(1, t.accumulatedDeg / TARGET_GOAL_DEG)
+    const pulse = 0.6 + 0.4 * Math.sin(t.phase * 1.4)
+    // Outer glow
+    const glow = ctx.createRadialGradient(t.x, t.y, t.r * 0.6, t.x, t.y, t.r * 1.6)
+    glow.addColorStop(0, `rgba(34,197,94,${0.18 * pulse})`)
+    glow.addColorStop(1, 'rgba(34,197,94,0)')
+    ctx.fillStyle = glow
+    ctx.beginPath(); ctx.arc(t.x, t.y, t.r * 1.6, 0, TWO_PI); ctx.fill()
+    // Ring track (dim)
+    ctx.strokeStyle = 'rgba(34,197,94,0.35)'
+    ctx.lineWidth = 5
+    ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, TWO_PI); ctx.stroke()
+    // Progress arc (bright, fills clockwise from top)
+    ctx.strokeStyle = '#22c55e'
+    ctx.lineWidth = 6
+    ctx.beginPath()
+    ctx.arc(t.x, t.y, t.r, -Math.PI / 2, -Math.PI / 2 + progress * TWO_PI)
+    ctx.stroke()
+    // Capture-radius hint (dashed, very faint)
+    ctx.strokeStyle = 'rgba(34,197,94,0.18)'
+    ctx.setLineDash([6, 6])
+    ctx.lineWidth = 1
+    ctx.beginPath(); ctx.arc(t.x, t.y, t.captureR, 0, TWO_PI); ctx.stroke()
+    ctx.setLineDash([])
+    // Centre dot + degree number
+    ctx.fillStyle = '#22c55e'
+    ctx.beginPath(); ctx.arc(t.x, t.y, 3, 0, TWO_PI); ctx.fill()
+    ctx.font = 'bold 18px "Anton", Impact, sans-serif'
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.fillStyle = 'rgba(255,255,255,0.9)'
+    ctx.fillText(`${Math.floor(t.accumulatedDeg)}°`, t.x, t.y + 24)
+  }
+}
+
 // ─── ConePhysics ─────────────────────────────────────────────────────────────
 export class ConePhysics {
   x0: number; y0: number

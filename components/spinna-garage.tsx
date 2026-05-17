@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { CARS, TIRES, TRACKS, SaveData, Car, Tire, Track } from '@/lib/spinna-data'
+import { CARS, TIRES, TRACKS, GAME_MODES, SaveData, Car, Tire, Track } from '@/lib/spinna-data'
 
 interface SpinnaGarageProps {
   save: SaveData
@@ -776,6 +776,39 @@ export default function SpinnaGarage({ save, onSave, onPlay, player, onLogin, on
                     </div>
                   ) : null
                 })()}
+              </div>
+            </div>
+
+            {/* Mode toggle */}
+            <div>
+              <div className="text-[9px] tracking-[4px] font-mono text-white/40 uppercase mb-2">
+                Mode
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {GAME_MODES.map(m => {
+                  const active = (save.mode ?? 'free') === m.id
+                  return (
+                    <button
+                      key={m.id}
+                      onClick={() => onSave({ ...save, mode: m.id })}
+                      className="rounded-lg border p-3 text-left transition-all"
+                      style={{
+                        borderColor: active ? m.accent : 'rgba(255,255,255,0.12)',
+                        background: active ? `${m.accent}1a` : 'rgba(0,0,0,0.30)',
+                      }}
+                    >
+                      <div className="text-[9px] tracking-[3px] font-mono" style={{ color: m.accent }}>
+                        {m.name}
+                      </div>
+                      <div className="mt-1 text-[10px] font-mono text-white/70 leading-tight">
+                        {m.subtitle}
+                      </div>
+                      <div className="mt-1 text-[9px] font-mono text-white/40 leading-snug">
+                        {m.description}
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
