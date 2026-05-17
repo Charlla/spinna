@@ -550,7 +550,7 @@ export function updateParticles(particles: Particle[], dt: number, gravity = fal
     p.vx *= 1 - (gravity ? 0.6 : 1.2) * dt
     p.vy *= 1 - (gravity ? 0.6 : 1.2) * dt
     if (gravity) p.vy += 60 * dt
-    if (!gravity) p.r += 14 * dt // smoke expands (slowed so longer-lived puffs don't blow up)
+    if (!gravity) p.r += 8 * dt // smoke expands (slowed so 3-5s puffs don't blow up)
   }
 }
 
@@ -563,14 +563,36 @@ export interface ScoreState {
   lastSpinFloor: number
   sessionTotalSpins: number
   sessionMaxCombo: number
+  damageBumps: number      // count of wall bumps in this session
+  damagePenalty: number    // total R deducted from score by wall bumps
 }
 
 export function createScoreState(): ScoreState {
   return {
     score: 0, comboDeg: 0, mult: 1,
     comboIdleT: 0, lastSpinFloor: 0,
-    sessionTotalSpins: 0, sessionMaxCombo: 0
+    sessionTotalSpins: 0, sessionMaxCombo: 0,
+    damageBumps: 0, damagePenalty: 0,
   }
+}
+
+/** Called by the canvas on every wall bump.
+ *  Cost scales with car speed at the moment of impact: gentle taps barely
+ *  hurt, but slamming a wall at 100+ km/h shaves big chunks off the score
+ *  and ends the current combo. Returns the points deducted. */
+export function applyWallDamage(state: ScoreState, car: CarPhysics): number {
+  const speed = Math.hypot(car.vx, car.vy)
+  // Min 80 (gentle nudge), scales up linearly with speed.
+  const cost = Math.floor(Math.max(80, speed * 4.5))
+  state.score = Math.max(0, state.score - cost)
+  state.damageBumps += 1
+  state.damagePenalty += cost
+  // Wall bumps reset the combo — punish careless driving.
+  state.comboDeg = 0
+  state.mult = 1
+  state.lastSpinFloor = 0
+  state.comboIdleT = 0
+  return cost
 }
 
 export function updateScore(
@@ -677,7 +699,10 @@ export function drawTireMarks(
 }
 
 // ─── Floor drawing ───────────────────────────────────────────────────────────
-export function drawFloor(ctx: CanvasRenderingContext2D) {
+/** Top-level floor renderer. Each track shares the same arena bounds but
+ *  decorates the asphalt differently. trackId values come from TRACKS in
+ *  spinna-data.ts; unknown ids fall back to 'donut'. */
+export function drawFloor(ctx: CanvasRenderingContext2D, trackId: string = 'donut') {
   const W = 1500, H = 1500
   const cx = 750, cy = 750
   const arena = ARENA
@@ -691,7 +716,7 @@ export function drawFloor(ctx: CanvasRenderingContext2D) {
   ctx.fillStyle = bg
   ctx.fillRect(0, 0, W, H)
 
-  // Grit noise
+  // Grit noise (every track gets this for visual consistency)
   ctx.fillStyle = 'rgba(0,0,0,0.4)'
   let seed = 9999
   const prng = () => { seed = (9301 * seed + 49297) % 233280; return seed / 233280 }
@@ -713,6 +738,23 @@ export function drawFloor(ctx: CanvasRenderingContext2D) {
   for (let i = 0; i < 8000; i++) ctx.fillRect(arena.l + prng() * sw, arena.t + prng() * sh, 1, 1)
   ctx.fillStyle = 'rgba(0,0,0,0.18)'
   for (let i = 0; i < 6500; i++) ctx.fillRect(arena.l + prng() * sw, arena.t + prng() * sh, 1, 1)
+
+  // Per-track overlay
+  switch (trackId) {
+    case 'intersection': return drawIntersection(ctx)
+    case 'airport':      return drawAirport(ctx)
+    case 'harbour':      return drawHarbour(ctx)
+    case 'cityblock':    return drawCityBlock(ctx)
+    case 'shisanyama':   return drawShisaNyama(ctx)
+    case 'donut':
+    default:             return drawDonut(ctx)
+  }
+}
+
+function drawDonut(ctx: CanvasRenderingContext2D) {
+  const cx = 750, cy = 750
+  const arena = ARENA
+  const sw = arena.r - arena.l, sh = arena.b - arena.t
 
   // Donut rings
   const ra = sw / 2 - 60, rb = sh / 2 - 40
@@ -809,7 +851,13 @@ export function drawFloor(ctx: CanvasRenderingContext2D) {
   ctx.fillRect(cx - 1.5, cy - 14, 3, 28)
   ctx.fillRect(cx - 14, cy - 1.5, 28, 3)
 
-  // Boundary lines
+  drawBoundary(ctx)
+}
+
+// Shared dashed-yellow + thin-red arena boundary used by every track.
+function drawBoundary(ctx: CanvasRenderingContext2D) {
+  const arena = ARENA
+  const sw = arena.r - arena.l, sh = arena.b - arena.t
   ctx.strokeStyle = '#fcd00b'
   ctx.lineWidth = 4
   ctx.setLineDash([22, 14])
@@ -818,6 +866,294 @@ export function drawFloor(ctx: CanvasRenderingContext2D) {
   ctx.strokeStyle = 'rgba(222,56,49,0.5)'
   ctx.lineWidth = 1
   ctx.strokeRect(arena.l + 12, arena.t + 12, sw - 24, sh - 24)
+}
+
+// ─── Intersection ─────────────────────────────────────────────────────────────
+// Four-way crossroads: two perpendicular wide roads with stop-line markings.
+function drawIntersection(ctx: CanvasRenderingContext2D) {
+  const cx = 750, cy = 750
+  const arena = ARENA
+  const sw = arena.r - arena.l, sh = arena.b - arena.t
+  const roadW = 220
+  // North-south & east-west roads (slightly darker asphalt)
+  ctx.fillStyle = '#0c0c10'
+  ctx.fillRect(cx - roadW / 2, arena.t, roadW, sh)
+  ctx.fillRect(arena.l, cy - roadW / 2, sw, roadW)
+  // Centre dashed line (yellow), N-S
+  ctx.strokeStyle = '#fcd00b'
+  ctx.lineWidth = 3
+  ctx.setLineDash([30, 22])
+  ctx.beginPath(); ctx.moveTo(cx, arena.t + 20); ctx.lineTo(cx, arena.b - 20); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(arena.l + 20, cy); ctx.lineTo(arena.r - 20, cy); ctx.stroke()
+  ctx.setLineDash([])
+  // White edge lines
+  ctx.strokeStyle = 'rgba(245,245,240,0.85)'
+  ctx.lineWidth = 2
+  ctx.strokeRect(cx - roadW / 2 + 6, arena.t, roadW - 12, sh)
+  ctx.strokeRect(arena.l, cy - roadW / 2 + 6, sw, roadW - 12)
+  // Stop bars (where the roads enter the central intersection box)
+  ctx.fillStyle = '#f5f5f0'
+  ctx.fillRect(cx - roadW / 2 + 8, cy - roadW / 2 - 10, roadW - 16, 6)
+  ctx.fillRect(cx - roadW / 2 + 8, cy + roadW / 2 + 4, roadW - 16, 6)
+  ctx.fillRect(cx - roadW / 2 - 10, cy - roadW / 2 + 8, 6, roadW - 16)
+  ctx.fillRect(cx + roadW / 2 + 4, cy - roadW / 2 + 8, 6, roadW - 16)
+  // Pedestrian crossings (zebra stripes outside the box, on each entry)
+  const zebraDraw = (x: number, y: number, vertical: boolean) => {
+    ctx.fillStyle = '#f5f5f0'
+    for (let i = 0; i < 8; i++) {
+      if (vertical) ctx.fillRect(x + i * 12, y, 8, 28)
+      else ctx.fillRect(x, y + i * 12, 28, 8)
+    }
+  }
+  zebraDraw(cx - 48, cy - roadW / 2 - 50, true)   // north entry
+  zebraDraw(cx - 48, cy + roadW / 2 + 22, true)   // south entry
+  zebraDraw(cx - roadW / 2 - 50, cy - 48, false)  // west entry
+  zebraDraw(cx + roadW / 2 + 22, cy - 48, false)  // east entry
+  // Centre name watermark
+  ctx.save()
+  ctx.font = 'bold 80px "Anton", Impact, sans-serif'
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  ctx.fillStyle = 'rgba(255,255,255,0.04)'
+  ctx.fillText('4-WAY', cx, cy - 20)
+  ctx.font = 'bold 32px "Anton", Impact, sans-serif'
+  ctx.fillStyle = 'rgba(252,208,11,0.06)'
+  ctx.fillText('STOP', cx, cy + 30)
+  ctx.restore()
+  drawBoundary(ctx)
+}
+
+// ─── Old airstrip ─────────────────────────────────────────────────────────────
+// Single long runway with painted numbers + runway lights along the edges.
+function drawAirport(ctx: CanvasRenderingContext2D) {
+  const cx = 750, cy = 750
+  const arena = ARENA
+  // Wide grey runway
+  const rwW = 600
+  ctx.fillStyle = '#15151a'
+  ctx.fillRect(cx - rwW / 2, arena.t + 40, rwW, arena.b - arena.t - 80)
+  // Centre dashed white line
+  ctx.strokeStyle = '#f5f5f0'
+  ctx.lineWidth = 6
+  ctx.setLineDash([60, 36])
+  ctx.beginPath(); ctx.moveTo(cx, arena.t + 80); ctx.lineTo(cx, arena.b - 80); ctx.stroke()
+  ctx.setLineDash([])
+  // Solid white edges
+  ctx.strokeStyle = 'rgba(245,245,240,0.85)'
+  ctx.lineWidth = 3
+  ctx.beginPath(); ctx.moveTo(cx - rwW / 2 + 18, arena.t + 80); ctx.lineTo(cx - rwW / 2 + 18, arena.b - 80); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(cx + rwW / 2 - 18, arena.t + 80); ctx.lineTo(cx + rwW / 2 - 18, arena.b - 80); ctx.stroke()
+  // Threshold stripes (top + bottom)
+  ctx.fillStyle = '#f5f5f0'
+  for (let i = 0; i < 6; i++) {
+    ctx.fillRect(cx - rwW / 2 + 40 + i * 50, arena.t + 60, 28, 60)
+    ctx.fillRect(cx - rwW / 2 + 40 + i * 50, arena.b - 120, 28, 60)
+  }
+  // Runway numbers (huge)
+  ctx.save()
+  ctx.font = 'bold 220px "Anton", Impact, sans-serif'
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  ctx.fillStyle = 'rgba(245,245,240,0.18)'
+  ctx.fillText('27', cx, arena.t + 230)
+  ctx.save()
+  ctx.translate(cx, arena.b - 230); ctx.rotate(Math.PI)
+  ctx.fillText('09', 0, 0)
+  ctx.restore()
+  ctx.restore()
+  // Runway edge lights — small yellow dots
+  ctx.fillStyle = 'rgba(252,208,11,0.7)'
+  for (let y = arena.t + 100; y <= arena.b - 100; y += 60) {
+    ctx.beginPath(); ctx.arc(cx - rwW / 2 - 14, y, 3, 0, TWO_PI); ctx.fill()
+    ctx.beginPath(); ctx.arc(cx + rwW / 2 + 14, y, 3, 0, TWO_PI); ctx.fill()
+  }
+  // Apron rectangles to either side
+  ctx.fillStyle = 'rgba(60,60,70,0.5)'
+  ctx.fillRect(arena.l + 30, arena.t + 200, 130, 200)
+  ctx.fillRect(arena.l + 30, arena.b - 400, 130, 200)
+  ctx.fillRect(arena.r - 160, arena.t + 200, 130, 200)
+  ctx.fillRect(arena.r - 160, arena.b - 400, 130, 200)
+  drawBoundary(ctx)
+}
+
+// ─── Harbour docks ────────────────────────────────────────────────────────────
+// Concrete pad with container blocks lining the edges.
+function drawHarbour(ctx: CanvasRenderingContext2D) {
+  const cx = 750, cy = 750
+  const arena = ARENA
+  // Bluish concrete tint
+  ctx.fillStyle = 'rgba(20,30,40,0.5)'
+  ctx.fillRect(arena.l, arena.t, arena.r - arena.l, arena.b - arena.t)
+  // Concrete joint grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'
+  ctx.lineWidth = 1
+  for (let x = arena.l; x <= arena.r; x += 120) {
+    ctx.beginPath(); ctx.moveTo(x, arena.t); ctx.lineTo(x, arena.b); ctx.stroke()
+  }
+  for (let y = arena.t; y <= arena.b; y += 120) {
+    ctx.beginPath(); ctx.moveTo(arena.l, y); ctx.lineTo(arena.r, y); ctx.stroke()
+  }
+  // Cargo containers along the four edges (rectangles in shipping colours)
+  const colors = ['#cc3300', '#1c69d4', '#22c55e', '#e6a300', '#7c2128', '#06b6d4']
+  const cw = 90, ch = 30
+  const placeContainer = (x: number, y: number, idx: number, rotated: boolean) => {
+    ctx.save()
+    ctx.translate(x, y)
+    if (rotated) ctx.rotate(Math.PI / 2)
+    ctx.fillStyle = colors[idx % colors.length]
+    ctx.fillRect(-cw / 2, -ch / 2, cw, ch)
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'
+    for (let k = 0; k < 6; k++) ctx.fillRect(-cw / 2 + 4 + k * 14, -ch / 2 + 2, 1, ch - 4)
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)'
+    ctx.strokeRect(-cw / 2, -ch / 2, cw, ch)
+    ctx.restore()
+  }
+  // Top + bottom rows
+  for (let i = 0; i < 12; i++) {
+    placeContainer(arena.l + 80 + i * 105, arena.t + 50, i, false)
+    placeContainer(arena.l + 80 + i * 105, arena.b - 50, i + 3, false)
+  }
+  // Left + right rows
+  for (let i = 0; i < 12; i++) {
+    placeContainer(arena.l + 50, arena.t + 80 + i * 105, i + 1, true)
+    placeContainer(arena.r - 50, arena.t + 80 + i * 105, i + 2, true)
+  }
+  // Big "DOCKS" watermark
+  ctx.save()
+  ctx.font = 'bold 200px "Anton", Impact, sans-serif'
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  ctx.fillStyle = 'rgba(6,182,212,0.06)'
+  ctx.fillText('DOCKS', cx, cy)
+  ctx.restore()
+  drawBoundary(ctx)
+}
+
+// ─── City block ───────────────────────────────────────────────────────────────
+// Narrow tar between high-rise rooftops (top-down).
+function drawCityBlock(ctx: CanvasRenderingContext2D) {
+  const cx = 750, cy = 750
+  const arena = ARENA
+  // Dark tar centre rectangle
+  const tar = 60
+  ctx.fillStyle = '#0a0a0e'
+  ctx.fillRect(arena.l + tar, arena.t + tar, arena.r - arena.l - tar * 2, arena.b - arena.t - tar * 2)
+  // White lane lines on the inner road
+  ctx.strokeStyle = 'rgba(245,245,240,0.6)'
+  ctx.lineWidth = 2
+  ctx.setLineDash([18, 14])
+  ctx.strokeRect(cx - 200, cy - 200, 400, 400)
+  ctx.setLineDash([])
+  // Building rooftops — rectangles along edges with little air-con units
+  const drawBuilding = (x: number, y: number, w: number, h: number, color: string) => {
+    ctx.fillStyle = color
+    ctx.fillRect(x, y, w, h)
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)'
+    ctx.strokeRect(x, y, w, h)
+    // air-con boxes
+    ctx.fillStyle = 'rgba(255,255,255,0.18)'
+    for (let i = 0; i < 3; i++) {
+      ctx.fillRect(x + 6 + i * 12, y + h - 18, 8, 8)
+    }
+    // door / skylight
+    ctx.fillStyle = 'rgba(252,208,11,0.4)'
+    ctx.fillRect(x + w / 2 - 4, y + h / 2 - 4, 8, 8)
+  }
+  // Top edge buildings
+  let xc = arena.l
+  while (xc < arena.r) {
+    const w = 90 + (xc % 17) * 5
+    const c = ['#3a3a44', '#2e2e36', '#4a3a3a', '#3a4a4a'][xc % 4]
+    drawBuilding(xc, arena.t, Math.min(w, arena.r - xc), tar - 4, c)
+    xc += w + 4
+  }
+  xc = arena.l
+  while (xc < arena.r) {
+    const w = 80 + (xc % 13) * 6
+    const c = ['#2e2e36', '#3a3a44', '#3a4a4a', '#4a3a3a'][xc % 4]
+    drawBuilding(xc, arena.b - tar + 4, Math.min(w, arena.r - xc), tar - 4, c)
+    xc += w + 4
+  }
+  let yc = arena.t + tar
+  while (yc < arena.b - tar) {
+    const h = 75 + (yc % 19) * 5
+    const c = ['#3a3a44', '#2e2e36', '#4a3a3a', '#3a4a4a'][yc % 4]
+    drawBuilding(arena.l, yc, tar - 4, Math.min(h, arena.b - tar - yc), c)
+    yc += h + 4
+  }
+  yc = arena.t + tar
+  while (yc < arena.b - tar) {
+    const h = 88 + (yc % 11) * 4
+    const c = ['#2e2e36', '#3a3a44', '#3a4a4a', '#4a3a3a'][yc % 4]
+    drawBuilding(arena.r - tar + 4, yc, tar - 4, Math.min(h, arena.b - tar - yc), c)
+    yc += h + 4
+  }
+  // CBD watermark
+  ctx.save()
+  ctx.font = 'bold 200px "Anton", Impact, sans-serif'
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  ctx.fillStyle = 'rgba(168,85,247,0.06)'
+  ctx.fillText('CBD', cx, cy)
+  ctx.restore()
+  drawBoundary(ctx)
+}
+
+// ─── Shisa Nyama ──────────────────────────────────────────────────────────────
+// Open lot with bonfires + braai drums + crowd on the sidelines.
+function drawShisaNyama(ctx: CanvasRenderingContext2D) {
+  const cx = 750, cy = 750
+  const arena = ARENA
+  // Dusty brown ground tint
+  ctx.fillStyle = 'rgba(60,40,20,0.35)'
+  ctx.fillRect(arena.l, arena.t, arena.r - arena.l, arena.b - arena.t)
+  // Tyre marks pre-drawn (looks like a well-used spinpad)
+  ctx.strokeStyle = 'rgba(15,12,10,0.4)'
+  ctx.lineWidth = 4
+  for (let i = 0; i < 6; i++) {
+    const r = 200 + i * 30
+    const off = (i % 2 === 0 ? 1 : -1) * 30
+    ctx.beginPath()
+    ctx.ellipse(cx + off, cy, r, r * 0.85, 0, 0, TWO_PI)
+    ctx.stroke()
+  }
+  // Bonfire drums at corners
+  const fire = (x: number, y: number) => {
+    // drum
+    ctx.fillStyle = '#1a1a1a'
+    ctx.beginPath(); ctx.ellipse(x, y, 22, 12, 0, 0, TWO_PI); ctx.fill()
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)'
+    ctx.stroke()
+    // flames
+    const grad = ctx.createRadialGradient(x, y - 8, 4, x, y - 8, 32)
+    grad.addColorStop(0, 'rgba(255,250,200,0.9)')
+    grad.addColorStop(0.4, 'rgba(255,160,40,0.7)')
+    grad.addColorStop(1, 'rgba(180,60,20,0)')
+    ctx.fillStyle = grad
+    ctx.beginPath(); ctx.arc(x, y - 8, 32, 0, TWO_PI); ctx.fill()
+  }
+  fire(arena.l + 90, arena.t + 90)
+  fire(arena.r - 90, arena.t + 90)
+  fire(arena.l + 90, arena.b - 90)
+  fire(arena.r - 90, arena.b - 90)
+  fire(cx - 380, cy)
+  fire(cx + 380, cy)
+  // Crowd dots along the edges
+  ctx.fillStyle = 'rgba(180,180,180,0.5)'
+  for (let x = arena.l + 30; x < arena.r; x += 18) {
+    ctx.beginPath(); ctx.arc(x, arena.t + 30, 4, 0, TWO_PI); ctx.fill()
+    ctx.beginPath(); ctx.arc(x, arena.b - 30, 4, 0, TWO_PI); ctx.fill()
+  }
+  for (let y = arena.t + 50; y < arena.b - 50; y += 18) {
+    ctx.beginPath(); ctx.arc(arena.l + 30, y, 4, 0, TWO_PI); ctx.fill()
+    ctx.beginPath(); ctx.arc(arena.r - 30, y, 4, 0, TWO_PI); ctx.fill()
+  }
+  // Watermark
+  ctx.save()
+  ctx.font = 'bold 160px "Anton", Impact, sans-serif'
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  ctx.fillStyle = 'rgba(239,68,68,0.10)'
+  ctx.fillText('SHISA', cx, cy - 50)
+  ctx.fillStyle = 'rgba(252,208,11,0.10)'
+  ctx.fillText('NYAMA', cx, cy + 80)
+  ctx.restore()
+  drawBoundary(ctx)
 }
 
 // ─── Audio ───────────────────────────────────────────────────────────────────
@@ -1024,27 +1360,25 @@ export function spawnSmoke(
   slipping: boolean
 ) {
   if (!wheelspin && !slipping) return
-  // Thicker plumes: bigger cap and more spawns per frame.
-  if (smoke.length > 220) return
+  // Fewer puffs but they hang around twice as long, so a faint trail
+  // lingers between spawns — denser-looking without crowding the canvas.
+  if (smoke.length > 140) return
   const wheels = car.rearWheels()
   const speed = Math.hypot(car.vx, car.vy)
-  const intensity = wheelspin && slipping ? 2 : 1  // both = double the puffs
   for (const w of wheels) {
-    for (let i = 0; i < intensity; i++) {
-      if (Math.random() > 0.85) continue
-      smoke.push({
-        x: w.x + rand(-3, 3),
-        y: w.y + rand(-3, 3),
-        vx: -car.vx * 0.08 + rand(-12, 12),
-        vy: -car.vy * 0.08 + rand(-12, 12),
-        r: rand(5, 10),
-        // Was 0.4–0.9s — now 1.6–2.4s so the trail hangs much longer.
-        life: rand(1.6, 2.4),
-        maxLife: 2.4,
-        alpha: clamp(0.35 + speed / 480, 0.2, 0.75),
-        color: '140,130,120',
-      })
-    }
+    if (Math.random() > 0.45) continue
+    smoke.push({
+      x: w.x + rand(-3, 3),
+      y: w.y + rand(-3, 3),
+      vx: -car.vx * 0.08 + rand(-10, 10),
+      vy: -car.vy * 0.08 + rand(-10, 10),
+      r: rand(5, 9),
+      // Was 1.6–2.4s → 3.2–4.8s so each puff lasts twice as long.
+      life: rand(3.2, 4.8),
+      maxLife: 4.8,
+      alpha: clamp(0.30 + speed / 520, 0.18, 0.65),
+      color: '140,130,120',
+    })
   }
 }
 

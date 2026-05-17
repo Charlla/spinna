@@ -33,7 +33,8 @@ export default function GamePage() {
   const [view, setView] = useState<'play' | 'results'>('play')
   const [stats, setStats] = useState<GameStats>({
     score: 0, comboDeg: 0, mult: 1, speedKmh: 0,
-    tireHealth: 100, tireName: '', totalSpins: 0, maxCombo: 0
+    tireHealth: 100, tireName: '', totalSpins: 0, maxCombo: 0,
+    damageBumps: 0, damagePenalty: 0, lastBumpCost: 0,
   })
   const [banner, setBanner] = useState({ key: 0, text: '', sub: '', color: '#fcd00b' })
   const [result, setResult] = useState<GameResult | null>(null)
@@ -74,7 +75,7 @@ export default function GamePage() {
     if (started) return
     const tryStart = () => {
       if (canvasRef.current) {
-        canvasRef.current.start(save.car, save.tires, save.tireHealth)
+        canvasRef.current.start(save.car, save.tires, save.tireHealth, save.track ?? 'donut')
         setStarted(true)
       } else {
         setTimeout(tryStart, 100)

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { CARS, TIRES, SaveData, Car, Tire } from '@/lib/spinna-data'
+import { CARS, TIRES, TRACKS, SaveData, Car, Tire, Track } from '@/lib/spinna-data'
 
 interface SpinnaGarageProps {
   save: SaveData
@@ -12,9 +12,9 @@ interface SpinnaGarageProps {
   onLogout: () => void
 }
 
-type Step = 'car' | 'tires' | 'spin'
-const STEPS: Step[] = ['car', 'tires', 'spin']
-const STEP_LABEL: Record<Step, string> = { car: 'Ride', tires: 'Tyres', spin: 'Go' }
+type Step = 'car' | 'tires' | 'track' | 'spin'
+const STEPS: Step[] = ['car', 'tires', 'track', 'spin']
+const STEP_LABEL: Record<Step, string> = { car: 'Ride', tires: 'Tyres', track: 'Track', spin: 'Go' }
 
 function StatBar({ value, color = '#fcd00b' }: { value: number; color?: string }) {
   return (
@@ -420,6 +420,166 @@ function TireCarousel({
   )
 }
 
+// ── Track carousel — pick the spin track ──────────────────────────────────────
+function TrackCarousel({
+  tracks, currentId, onSelect,
+}: {
+  tracks: Track[]
+  currentId: string
+  onSelect: (id: string) => void
+}) {
+  const startIdx = Math.max(0, tracks.findIndex(t => t.id === currentId))
+  const [idx, setIdx] = useState(startIdx)
+  const track = tracks[idx]
+  const go = (delta: number) =>
+    setIdx(i => (i + delta + tracks.length) % tracks.length)
+  return (
+    <div className="space-y-3">
+      <div className="text-[9px] tracking-[4px] font-mono text-white/40 uppercase text-center">
+        Pick your track
+      </div>
+      <div className="relative rounded-xl border border-white/10 bg-gradient-to-b from-zinc-900/40 via-black/60 to-black/70 backdrop-blur-md overflow-hidden py-6 px-3">
+        <div
+          className="absolute inset-x-0 top-0 h-32 pointer-events-none"
+          style={{ background: `radial-gradient(circle at 50% 0%, ${track.accent}33, transparent 60%)` }}
+        />
+        <div className="flex justify-center gap-1 mb-3">
+          {tracks.map((t, i) => (
+            <span
+              key={t.id}
+              className="w-1.5 h-1.5 rounded-full transition-all"
+              style={{
+                backgroundColor: i === idx ? t.accent : 'rgba(255,255,255,0.18)',
+                transform: i === idx ? 'scale(1.4)' : 'scale(1)',
+              }}
+            />
+          ))}
+        </div>
+        <div className="flex items-stretch gap-2">
+          <button
+            onClick={() => go(-1)}
+            aria-label="Previous track"
+            className="shrink-0 w-9 self-stretch rounded-md border border-white/10 bg-black/40 hover:bg-black/60 transition flex items-center justify-center text-white/60 hover:text-amber-300 text-2xl"
+          >
+            ‹
+          </button>
+          <div className="flex-1 flex flex-col items-center text-center px-1">
+            <TrackPreview track={track} />
+            <div className="mt-3 text-[9px] tracking-[4px] font-mono uppercase" style={{ color: track.accent }}>
+              {track.subtitle}
+            </div>
+            <div className="mt-1 font-mono font-extrabold text-white text-lg leading-tight">
+              {track.name}
+            </div>
+          </div>
+          <button
+            onClick={() => go(1)}
+            aria-label="Next track"
+            className="shrink-0 w-9 self-stretch rounded-md border border-white/10 bg-black/40 hover:bg-black/60 transition flex items-center justify-center text-white/60 hover:text-amber-300 text-2xl"
+          >
+            ›
+          </button>
+        </div>
+      </div>
+      <button
+        onClick={() => onSelect(track.id)}
+        className="w-full rounded-lg font-mono text-[13px] tracking-[4px] font-extrabold text-black bg-amber-300 hover:bg-amber-200 active:scale-[0.99] transition py-3 shadow-[0_0_20px_rgba(252,208,11,0.3)]"
+      >
+        SET TRACK ▸
+      </button>
+    </div>
+  )
+}
+
+/** Tiny stylised top-down icon of each track so the picker has a real preview. */
+function TrackPreview({ track }: { track: Track }) {
+  const W = 110, H = 110
+  switch (track.id) {
+    case 'intersection':
+      return (
+        <svg viewBox="0 0 100 100" width={W} height={H} aria-hidden="true">
+          <rect x="0" y="0" width="100" height="100" fill="#1a1a1f" />
+          <rect x="40" y="0" width="20" height="100" fill="#0c0c10" />
+          <rect x="0" y="40" width="100" height="20" fill="#0c0c10" />
+          <line x1="50" y1="0"  x2="50" y2="100" stroke={track.accent} strokeDasharray="3 2" strokeWidth="1" />
+          <line x1="0"  y1="50" x2="100" y2="50" stroke={track.accent} strokeDasharray="3 2" strokeWidth="1" />
+          <rect x="42" y="34" width="16" height="2" fill="#fff" />
+          <rect x="42" y="64" width="16" height="2" fill="#fff" />
+          <rect x="34" y="42" width="2" height="16" fill="#fff" />
+          <rect x="64" y="42" width="2" height="16" fill="#fff" />
+        </svg>
+      )
+    case 'airport':
+      return (
+        <svg viewBox="0 0 100 100" width={W} height={H} aria-hidden="true">
+          <rect x="0" y="0" width="100" height="100" fill="#1a1a1f" />
+          <rect x="36" y="6" width="28" height="88" fill="#15151a" />
+          <line x1="50" y1="14" x2="50" y2="86" stroke="#fff" strokeDasharray="4 3" strokeWidth="1.5" />
+          {[0, 1, 2, 3].map(i => <rect key={`t${i}`} x={40 + i * 5} y="8" width="3" height="6" fill="#fff" />)}
+          {[0, 1, 2, 3].map(i => <rect key={`b${i}`} x={40 + i * 5} y="86" width="3" height="6" fill="#fff" />)}
+          {[0, 1, 2, 3, 4, 5].map(i => <circle key={`l${i}`} cx="34" cy={20 + i * 12} r="1" fill={track.accent} />)}
+          {[0, 1, 2, 3, 4, 5].map(i => <circle key={`r${i}`} cx="66" cy={20 + i * 12} r="1" fill={track.accent} />)}
+        </svg>
+      )
+    case 'harbour':
+      return (
+        <svg viewBox="0 0 100 100" width={W} height={H} aria-hidden="true">
+          <rect x="0" y="0" width="100" height="100" fill="#15252e" />
+          {['#cc3300', '#1c69d4', '#22c55e', '#e6a300', '#06b6d4'].map((c, i) => (
+            <rect key={`t${i}`} x={6 + i * 18} y="6" width="14" height="8" fill={c} />
+          ))}
+          {['#22c55e', '#1c69d4', '#cc3300', '#e6a300', '#06b6d4'].map((c, i) => (
+            <rect key={`b${i}`} x={6 + i * 18} y="86" width="14" height="8" fill={c} />
+          ))}
+          {['#1c69d4', '#cc3300', '#22c55e'].map((c, i) => (
+            <rect key={`l${i}`} x="6" y={24 + i * 18} width="8" height="14" fill={c} />
+          ))}
+          {['#cc3300', '#22c55e', '#1c69d4'].map((c, i) => (
+            <rect key={`r${i}`} x="86" y={24 + i * 18} width="8" height="14" fill={c} />
+          ))}
+        </svg>
+      )
+    case 'cityblock':
+      return (
+        <svg viewBox="0 0 100 100" width={W} height={H} aria-hidden="true">
+          <rect x="0" y="0" width="100" height="100" fill="#0a0a0e" />
+          {[0,1,2,3,4,5].map(i => <rect key={`t${i}`} x={6 + i * 15} y="6" width="13" height="14" fill={['#3a3a44','#2e2e36','#4a3a3a','#3a4a4a'][i%4]} />)}
+          {[0,1,2,3,4,5].map(i => <rect key={`b${i}`} x={6 + i * 15} y="80" width="13" height="14" fill={['#2e2e36','#3a3a44','#3a4a4a','#4a3a3a'][i%4]} />)}
+          {[0,1,2,3].map(i => <rect key={`l${i}`} x="6" y={26 + i * 13} width="14" height="11" fill={['#3a3a44','#2e2e36','#4a3a3a','#3a4a4a'][i%4]} />)}
+          {[0,1,2,3].map(i => <rect key={`r${i}`} x="80" y={26 + i * 13} width="14" height="11" fill={['#2e2e36','#3a3a44','#3a4a4a','#4a3a3a'][i%4]} />)}
+          <rect x="32" y="32" width="36" height="36" fill="none" stroke={track.accent} strokeDasharray="3 2" strokeWidth="0.8" />
+        </svg>
+      )
+    case 'shisanyama':
+      return (
+        <svg viewBox="0 0 100 100" width={W} height={H} aria-hidden="true">
+          <rect x="0" y="0" width="100" height="100" fill="#2a1c10" />
+          {[[20,20],[80,20],[20,80],[80,80],[10,50],[90,50]].map(([x,y], i) => (
+            <g key={i}>
+              <circle cx={x} cy={y - 2} r="6" fill={track.accent} opacity="0.7" />
+              <circle cx={x} cy={y - 3} r="3" fill="#fff8c0" />
+              <rect x={x - 4} y={y + 2} width="8" height="3" fill="#1a1a1a" />
+            </g>
+          ))}
+          <ellipse cx="50" cy="50" rx="32" ry="22" fill="none" stroke="rgba(15,12,10,0.6)" strokeWidth="1.5" />
+          <ellipse cx="50" cy="50" rx="24" ry="16" fill="none" stroke="rgba(15,12,10,0.4)" strokeWidth="1" />
+        </svg>
+      )
+    case 'donut':
+    default:
+      return (
+        <svg viewBox="0 0 100 100" width={W} height={H} aria-hidden="true">
+          <rect x="0" y="0" width="100" height="100" fill="#1a1a1f" />
+          <circle cx="50" cy="50" r="38" fill="#16161b" />
+          <circle cx="50" cy="50" r="20" fill="#1a1a1f" />
+          <circle cx="50" cy="50" r="38" fill="none" stroke={track.accent} strokeDasharray="4 3" strokeWidth="2" />
+          <circle cx="50" cy="50" r="20" fill="none" stroke="#d92d2d" strokeDasharray="3 2" strokeWidth="1.5" />
+          <rect x="48" y="74" width="4" height="20" fill="#fff" />
+        </svg>
+      )
+  }
+}
+
 function TirePreview() {
   return (
     <svg viewBox="0 0 100 100" width={96} height={96} aria-hidden="true">
@@ -485,6 +645,11 @@ export default function SpinnaGarage({ save, onSave, onPlay, player, onLogin, on
     // First selection of a tire is free in this build (no separate purchase flow). Just mount it.
     onSave({ ...save, tires: tireId, tireHealth: 100 })
     void t
+    setStep('track')
+  }, [save, onSave])
+
+  const selectTrack = useCallback((trackId: string) => {
+    onSave({ ...save, track: trackId })
     setStep('spin')
   }, [save, onSave])
 
@@ -568,14 +733,31 @@ export default function SpinnaGarage({ save, onSave, onPlay, player, onLogin, on
           </div>
         )}
 
-        {/* ── Step 3: Confirm & spin ──────────────────────────────────────── */}
-        {step === 'spin' && (
-          <div className="space-y-4">
+        {/* ── Step 3: Pick your track ─────────────────────────────────────── */}
+        {step === 'track' && (
+          <div className="space-y-3">
             <button
               onClick={() => setStep('tires')}
               className="text-[10px] font-mono text-white/40 hover:text-white/70 transition"
             >
               ← Back to tyres
+            </button>
+            <TrackCarousel
+              tracks={TRACKS}
+              currentId={save.track ?? 'donut'}
+              onSelect={selectTrack}
+            />
+          </div>
+        )}
+
+        {/* ── Step 4: Confirm & spin ──────────────────────────────────────── */}
+        {step === 'spin' && (
+          <div className="space-y-4">
+            <button
+              onClick={() => setStep('track')}
+              className="text-[10px] font-mono text-white/40 hover:text-white/70 transition"
+            >
+              ← Back to track
             </button>
             <div className="text-[9px] tracking-[4px] font-mono text-white/40 uppercase">
               Ready to spin
@@ -586,6 +768,14 @@ export default function SpinnaGarage({ save, onSave, onPlay, player, onLogin, on
                 <div className="text-[8px] tracking-[3px] font-mono text-white/50">{car.tag}</div>
                 <div className="font-mono font-bold text-white text-base">{car.name}</div>
                 <div className="text-[10px] font-mono text-white/50 mt-1">on {tire.name}</div>
+                {(() => {
+                  const t = TRACKS.find(x => x.id === (save.track ?? 'donut'))
+                  return t ? (
+                    <div className="text-[10px] font-mono mt-1" style={{ color: t.accent }}>
+                      @ {t.name}
+                    </div>
+                  ) : null
+                })()}
               </div>
             </div>
 

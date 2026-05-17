@@ -25,9 +25,30 @@ export const CANVAS_W = 750
 export const CANVAS_H = 750
 export const ARENA = {l:80,t:80,r:1420,b:1420}
 
-export const DEFAULT_SAVE = {money:5000,car:"e30",ownedCars:["e30"],tires:"budget",tireHealth:100,bestPayout:0,bestScore:0,totalLifetimeRands:0}
+export const DEFAULT_SAVE = {money:5000,car:"e30",ownedCars:["e30"],tires:"budget",tireHealth:100,bestPayout:0,bestScore:0,totalLifetimeRands:0,track:"donut"}
 
-export const DEFAULT_TUNE = {enginePower:1.85,topSpeed:1,steerMaxRad:0.96,steerMinRad:0.227,gripLong:1.2,gripLat:0.75,lowSpeedStick:0.55,yawDamping:1,wearRate:0.05,rearBias:1.4,spinThrottle:0.6}
+// Tuned for an intense + loose feel — lower yawDamping + lower lateral grip
+// means the rear breaks loose more readily, while higher rearBias amplifies
+// throttle-induced sideways slip. enginePower bumped again so the bigger cars
+// have meaningful punch.
+export const DEFAULT_TUNE = {enginePower:2.05,topSpeed:1.05,steerMaxRad:0.98,steerMinRad:0.24,gripLong:1.2,gripLat:0.68,lowSpeedStick:0.55,yawDamping:0.85,wearRate:0.05,rearBias:1.55,spinThrottle:0.6}
+
+export interface Track {
+  id: string
+  name: string
+  subtitle: string
+  /** dot colour used in pickers / dot indicators */
+  accent: string
+}
+
+export const TRACKS: Track[] = [
+  { id: 'donut',        name: 'CLASSIC DONUT',  subtitle: 'The OG spin pad',         accent: '#fcd00b' },
+  { id: 'intersection', name: 'INTERSECTION',   subtitle: 'Four-way Mzansi style',   accent: '#22c55e' },
+  { id: 'airport',      name: 'OLD AIRSTRIP',   subtitle: 'Runway lights, no tower', accent: '#3b82f6' },
+  { id: 'harbour',      name: 'HARBOUR DOCKS',  subtitle: 'Containers, gulls, salt', accent: '#06b6d4' },
+  { id: 'cityblock',    name: 'CITY BLOCK',     subtitle: 'Tar between high-rises',  accent: '#a855f7' },
+  { id: 'shisanyama',   name: 'SHISA NYAMA',    subtitle: 'Smoke, fires, no rules',  accent: '#ef4444' },
+]
 
 export const MILESTONES = [
   {deg:360,text:"SPIN!",sub:"MFANA",c:"#fcd00b"},
@@ -53,6 +74,7 @@ export interface SaveData {
   bestPayout: number
   bestScore: number
   totalLifetimeRands: number
+  track: string
 }
 
 export interface TuneData {
@@ -78,4 +100,7 @@ export interface GameStats {
   tireName: string
   totalSpins: number
   maxCombo: number
+  damageBumps: number
+  damagePenalty: number
+  lastBumpCost: number     // bumps to >0 briefly when a wall is hit (for HUD pop)
 }

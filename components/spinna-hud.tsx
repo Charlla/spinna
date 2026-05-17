@@ -128,6 +128,28 @@ export default function SpinnaHud({
         <span className="text-[10px] tracking-[3px] font-mono text-white/55">KM/H</span>
       </div>
 
+      {/* ── Wall-bump damage popup (red −R cost, flashes for ~1s) ───────── */}
+      {stats.lastBumpCost > 0 && (
+        <div
+          aria-live="polite"
+          className="pointer-events-none absolute left-1/2 top-[calc(max(env(safe-area-inset-top),12px)+148px)] -translate-x-1/2 z-10 text-center font-mono font-extrabold tracking-[2px]"
+          style={{ color: '#ff2d2d', textShadow: '0 0 18px rgba(0,0,0,0.85)' }}
+        >
+          <div className="text-2xl">−R{stats.lastBumpCost.toLocaleString()}</div>
+          <div className="text-[9px] tracking-[3px] text-white/70 mt-0.5">PANELBEATER</div>
+        </div>
+      )}
+
+      {/* ── Damage tally (small, in the combo row corner) ───────────────── */}
+      {stats.damageBumps > 0 && (
+        <div className="pointer-events-none absolute top-[calc(max(env(safe-area-inset-top),12px)+136px)] right-3 z-10 text-right">
+          <div className="text-[8px] tracking-[2px] font-mono text-white/45">DAMAGE</div>
+          <div className="text-[11px] font-mono text-red-400 tabular-nums">
+            ×{stats.damageBumps} <span className="text-white/40">·</span> −R{stats.damagePenalty.toLocaleString()}
+          </div>
+        </div>
+      )}
+
       {/* ── Milestone banner ────────────────────────────────────────────── */}
       <div
         key={bannerKey}

@@ -25,16 +25,19 @@ test.describe.serial('Spinna smoke', () => {
     await expect(page.getByRole('button', { name: /Previous car/i })).toBeVisible()
   })
 
-  test('sequential flow: confirm ride → fit tyres → SPIN', async ({ page }) => {
+  test('sequential flow: ride → tyres → track → SPIN', async ({ page }) => {
     await page.goto('/')
-    // Step 1 — confirm the E30 (DRIVE button takes you to step 2)
+    // Step 1 — ride
     await expect(page.getByText(/Pick your ride/i).first()).toBeVisible({ timeout: 15_000 })
     await page.getByRole('button', { name: /^DRIVE/ }).click()
-    // Step 2 — tyres carousel
+    // Step 2 — tyres
     await expect(page.getByText(/Mount your tyres/i).first()).toBeVisible({ timeout: 5_000 })
-    await expect(page.getByRole('button', { name: /^FIT FRESH/ })).toBeVisible()
     await page.getByRole('button', { name: /^FIT FRESH/ }).click()
-    // Step 3 — confirm + SPIN
+    // Step 3 — track
+    await expect(page.getByText(/Pick your track/i).first()).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByRole('button', { name: /^SET TRACK/ })).toBeVisible()
+    await page.getByRole('button', { name: /^SET TRACK/ }).click()
+    // Step 4 — confirm + SPIN
     await expect(page.getByText(/Ready to spin/i)).toBeVisible({ timeout: 5_000 })
     await expect(page.getByRole('button', { name: /^SPIN/ })).toBeVisible()
   })
@@ -44,6 +47,7 @@ test.describe.serial('Spinna smoke', () => {
     await expect(page.getByText(/Sign in to save scores/i)).toBeVisible({ timeout: 5_000 })
     await page.getByRole('button', { name: /^DRIVE/ }).click()
     await page.getByRole('button', { name: /^FIT FRESH/ }).click()
+    await page.getByRole('button', { name: /^SET TRACK/ }).click()
     await page.getByRole('button', { name: /^SPIN/ }).click()
     await page.waitForURL(/\/game/, { timeout: 5_000 })
     await expect(page.locator('canvas').first()).toBeVisible({ timeout: 10_000 })
@@ -53,6 +57,7 @@ test.describe.serial('Spinna smoke', () => {
     await page.goto('/')
     await page.getByRole('button', { name: /^DRIVE/ }).click()
     await page.getByRole('button', { name: /^FIT FRESH/ }).click()
+    await page.getByRole('button', { name: /^SET TRACK/ }).click()
     await page.getByRole('button', { name: /^SPIN/ }).click()
     await page.waitForURL(/\/game/, { timeout: 5_000 })
     const canvas = page.locator('canvas')
@@ -115,7 +120,7 @@ test.describe.serial('Spinna smoke', () => {
     await dialog.getByRole('button', { name: /RESET TO DEFAULTS/i }).click()
     const stored2 = await page.evaluate(() => localStorage.getItem('spinna_tune_v3'))
     const parsed2 = JSON.parse(stored2!) as { enginePower: number }
-    expect(parsed2.enginePower).toBeCloseTo(1.85, 2)
+    expect(parsed2.enginePower).toBeCloseTo(2.05, 2)
   })
 
   test('throttle slider sticks at tapped position', async ({ page }) => {

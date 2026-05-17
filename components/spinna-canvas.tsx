@@ -3,7 +3,7 @@
 import { useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react'
 import {
   CarPhysics, ConePhysics, CameraState,
-  createScoreState, updateScore,
+  createScoreState, updateScore, applyWallDamage,
   drawTireMarks, drawFloor, drawSmoke, drawSparks, drawCrowd,
   spawnSmoke, updateParticles, buildCrowd,
   initAudio, resumeAudio, updateAudio, playBoom,
@@ -26,7 +26,7 @@ interface SpinnaCanvasProps {
 }
 
 export interface SpinnaCanvasHandle {
-  start: (carId: string, tireId: string, tireHealth: number) => void
+  start: (carId: string, tireId: string, tireHealth: number, trackId?: string) => void
   stop: () => void
   isRunning: () => boolean
   getStats: () => GameStats
@@ -52,6 +52,8 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
       lastT: number
       worldT: number
       excitement: number
+      lastBumpAt: number
+      lastBumpCost: number
     }>({
       car: null,
       cones: [],
@@ -69,16 +71,32 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
       lastT: 0,
       worldT: 0,
       excitement: 0,
+      lastBumpAt: 0,
+      lastBumpCost: 0,
     })
 
     useImperativeHandle(ref, () => ({
-      start(carId: string, tireId: string, tireHealth: number) {
+      start(carId: string, tireId: string, tireHealth: number, trackId: string = 'donut') {
         const carDef = CARS.find(c => c.id === carId) ?? CARS[0]
         const tireDef = TIRES.find(t => t.id === tireId) ?? TIRES[1]
         const s = stateRef.current
 
+        // Re-bake the floor canvas with the chosen track.
+        if (s.floorCanvas) {
+          const fctx = s.floorCanvas.getContext('2d')
+          if (fctx) drawFloor(fctx, trackId)
+        }
+
         s.car = new CarPhysics(carDef, tireDef, tireHealth)
-        s.car.onBounce = () => { s.shakeAmp = Math.max(s.shakeAmp, 7); playBoom() }
+        s.car.onBounce = () => {
+          if (!s.car) return
+          // Wall bump: subtract big points (scaled by speed), kill combo, shake.
+          const cost = applyWallDamage(s.score, s.car)
+          s.lastBumpAt = performance.now()
+          s.lastBumpCost = cost
+          s.shakeAmp = Math.max(s.shakeAmp, 12)
+          playBoom()
+        }
         s.car.reset()
         s.cam.reset(s.car.x, s.car.y)
         s.score = createScoreState()
@@ -113,6 +131,9 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
       getStats(): GameStats {
         const s = stateRef.current
         const car = s.car
+        const now = performance.now()
+        // lastBumpCost surfaces for 1s after a bump so the HUD can pop it.
+        const lastBumpCost = (s.lastBumpAt && now - s.lastBumpAt < 1000) ? s.lastBumpCost : 0
         return {
           score: s.score.score,
           comboDeg: s.score.comboDeg,
@@ -122,6 +143,9 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
           tireName: s.tireName,
           totalSpins: s.score.sessionTotalSpins,
           maxCombo: s.score.sessionMaxCombo,
+          damageBumps: s.score.damageBumps,
+          damagePenalty: s.score.damagePenalty,
+          lastBumpCost,
         }
       },
     }), [inputsRef])
