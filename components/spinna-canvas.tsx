@@ -157,13 +157,15 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
     // Game loop
     const loop = useCallback((timestamp: number) => {
       const s = stateRef.current
-      if (!s.running) return
+      // Always reschedule — start() may flip running=true after a paused frame.
+      s.raf = requestAnimationFrame(loop)
+      if (!s.running) { s.lastT = 0; return }
 
       const canvas = canvasRef.current
-      if (!canvas) { s.raf = requestAnimationFrame(loop); return }
+      if (!canvas) return
 
       const ctx = canvas.getContext('2d')
-      if (!ctx) { s.raf = requestAnimationFrame(loop); return }
+      if (!ctx) return
 
       // Delta time
       const dt = s.lastT === 0 ? 1 / 60 : Math.min((timestamp - s.lastT) / 1000, 1 / 20)
@@ -290,8 +292,6 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
 
       ctx.restore()
       ctx.restore()
-
-      s.raf = requestAnimationFrame(loop)
     }, [active, inputsRef, tuneRef, onBanner])
 
     useEffect(() => {
