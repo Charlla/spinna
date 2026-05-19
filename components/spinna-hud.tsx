@@ -11,8 +11,7 @@ interface SpinnaHudProps {
   bannerSub: string
   bannerColor: string
   onCashOut: () => void
-  onTune: () => void
-  onExit: () => void
+  onMenu: () => void
 }
 
 /**
@@ -33,8 +32,7 @@ export default function SpinnaHud({
   bannerSub,
   bannerColor,
   onCashOut,
-  onTune,
-  onExit,
+  onMenu,
 }: SpinnaHudProps) {
   const tireH = Math.max(0, Math.min(100, stats.tireHealth))
   const popped = tireH < 1
@@ -76,19 +74,11 @@ export default function SpinnaHud({
           </button>
           <button
             type="button"
-            onClick={onTune}
-            aria-label="Open tuning panel"
-            className="font-mono font-bold text-[9px] tracking-[2px] text-amber-300 border border-amber-300/55 bg-[#141418]/70 backdrop-blur-md rounded-[3px] px-[11px] py-[7px] active:bg-[#282832]/85"
+            onClick={onMenu}
+            aria-label="Open menu and pause"
+            className="font-mono font-bold text-[9px] tracking-[2px] text-white/85 border border-white/25 bg-[#141418]/70 backdrop-blur-md rounded-[3px] px-[11px] py-[7px] active:bg-[#282832]/85"
           >
-            ⚙ TUNE
-          </button>
-          <button
-            type="button"
-            onClick={onExit}
-            aria-label="Exit to garage"
-            className="font-mono font-bold text-[9px] tracking-[2px] text-white/80 border border-white/20 bg-[#141418]/70 backdrop-blur-md rounded-[3px] px-[11px] py-[7px] active:bg-[#282832]/85"
-          >
-            ✕
+            ≡ MENU
           </button>
         </div>
       </div>

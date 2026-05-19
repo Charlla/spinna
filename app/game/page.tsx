@@ -7,6 +7,7 @@ import Link from 'next/link'
 import SpinnaHud from '@/components/spinna-hud'
 import SpinnaControls from '@/components/spinna-controls'
 import SpinnaTunePanel from '@/components/spinna-tune-panel'
+import PauseOverlay from '@/components/games/PauseOverlay'
 import { SpinnaCanvasHandle } from '@/components/spinna-canvas'
 import { SAVE_KEY, TUNE_KEY, DEFAULT_SAVE, DEFAULT_TUNE, SaveData, TuneData, GameStats } from '@/lib/spinna-data'
 
@@ -29,6 +30,7 @@ export default function GamePage() {
   const tuneRef = useRef<TuneData>({ ...DEFAULT_TUNE })
   const [tune, setTune] = useState<TuneData>({ ...DEFAULT_TUNE })
   const [tuneOpen, setTuneOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [save, setSave] = useState<SaveData>({ ...DEFAULT_SAVE })
   const [view, setView] = useState<'play' | 'results'>('play')
   const [stats, setStats] = useState<GameStats>({
@@ -200,7 +202,7 @@ export default function GamePage() {
             ref={canvasRef}
             inputsRef={inputsRef}
             tuneRef={tuneRef}
-            active={view === 'play'}
+            active={view === 'play' && !menuOpen}
             onBanner={handleBanner}
           />
           <SpinnaHud
@@ -211,8 +213,7 @@ export default function GamePage() {
             bannerSub={banner.sub}
             bannerColor={banner.color}
             onCashOut={handleCashOut}
-            onTune={openTune}
-            onExit={handleExit}
+            onMenu={() => setMenuOpen(true)}
           />
           <SpinnaControls inputsRef={inputsRef} resetKey={resetKey} />
           <SpinnaTunePanel
@@ -220,6 +221,13 @@ export default function GamePage() {
             tune={tune}
             onChange={handleTuneChange}
             onClose={closeTune}
+          />
+          <PauseOverlay
+            open={menuOpen}
+            title="PAUSED"
+            onResume={() => setMenuOpen(false)}
+            onSettings={() => { setMenuOpen(false); openTune() }}
+            onQuit={() => { setMenuOpen(false); handleExit() }}
           />
         </>
       )}
