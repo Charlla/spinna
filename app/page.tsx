@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import SpinnaGarage from '@/components/spinna-garage'
+import SpinnaIntro from '@/components/spinna-intro'
 import { SAVE_KEY, DEFAULT_SAVE, SaveData } from '@/lib/spinna-data'
 
 interface Player {
@@ -16,6 +17,7 @@ export default function Home() {
   const [save, setSave] = useState<SaveData>({ ...DEFAULT_SAVE })
   const [player, setPlayer] = useState<Player | null>(null)
   const [loaded, setLoaded] = useState(false)
+  const [showIntro, setShowIntro] = useState(true)
 
   // Load save from localStorage
   useEffect(() => {
@@ -63,10 +65,14 @@ export default function Home() {
     return (
       <main className="flex min-h-dvh items-center justify-center bg-[#0a0807]">
         <div className="font-mono text-amber-300 tracking-[6px] text-xs animate-pulse">
-          LOADING SPINNA…
+          LOADING SPINMFANA…
         </div>
       </main>
     )
+  }
+
+  if (showIntro) {
+    return <SpinnaIntro onStart={() => setShowIntro(false)} />
   }
 
   return (

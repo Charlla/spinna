@@ -117,15 +117,10 @@ export class CarPhysics {
     this.maxRev = def.maxRevSpeed
   }
 
-  effGripLong() {
-    const wear = clamp(this.tireHealth, 0, 100) / 100
-    return this.tireDef.gripLong * (0.25 + 0.75 * wear)
-  }
-
-  effGripLat() {
-    const wear = clamp(this.tireHealth, 0, 100) / 100
-    return this.tireDef.gripLat * (0.25 + 0.75 * wear)
-  }
+  // Grip is constant throughout the tire's life — they hold full traction
+  // until they pop at tireHealth=0 and the round ends.
+  effGripLong() { return this.tireDef.gripLong }
+  effGripLat()  { return this.tireDef.gripLat }
 
   reset() {
     this.x = CarPhysics.START_X

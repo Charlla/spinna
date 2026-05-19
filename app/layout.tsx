@@ -8,7 +8,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Spinna — SA Drift Arcade",
+  title: "Spinmfana — SA Drift Arcade",
   description: "South African car spinning / drifting arcade game. Spin for Rands. Shisa Nyama.",
 }
 

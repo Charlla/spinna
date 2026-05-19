@@ -46,7 +46,7 @@ export default function RegisterPage() {
               color: 'transparent',
             }}
           >
-            SPINNA
+            SPINMFANA
           </h1>
           <p className="mt-1 text-[10px] tracking-[4px] font-mono text-white/55">CREATE ACCOUNT</p>
         </div>

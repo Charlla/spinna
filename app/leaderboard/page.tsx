@@ -50,7 +50,7 @@ export default async function LeaderboardPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <div className="text-[8px] tracking-[5px] font-mono text-white/40 uppercase">Spinna</div>
+            <div className="text-[8px] tracking-[5px] font-mono text-white/40 uppercase">Spinmfana</div>
             <h1 className="font-mono font-black text-2xl text-amber-300 tracking-wide">LEADERBOARD</h1>
           </div>
           <Link
