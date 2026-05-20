@@ -19,11 +19,42 @@ import { CARS, TIRES, DEFAULT_TUNE, TuneData, GameStats } from '@/lib/spinna-dat
 const CANVAS_DISPLAY = 440
 const WORLD_SIZE = 1500
 
+export interface ServerRing {
+  x: number
+  y: number
+  r: number
+  captureR: number
+  ringIdx: number
+}
+
+export interface OpponentPos {
+  player_id: string
+  x: number
+  y: number
+  heading: number
+  omega: number
+  /** Display color for their car body (defaults to a muted gray). */
+  color?: string
+}
+
+export interface MultiplayerConfig {
+  /** Live ring authority from the room (server-set). */
+  ringRef: React.RefObject<ServerRing | null>
+  /** Other players' positions, updated by the room client from the
+   *  broadcast channel. */
+  opponentsRef: React.RefObject<OpponentPos[]>
+  /** Fired when the local player completes ≥330° around the active ring.
+   *  The room client posts to /api/rooms/[code]/bank in response. */
+  onRingComplete: (ringIdx: number) => void
+}
+
 interface SpinnaCanvasProps {
   inputsRef: React.RefObject<{ throttle: number; steer: number; hbrk: boolean }>
   tuneRef: React.RefObject<TuneData>
   active: boolean
   onBanner: (text: string, sub: string, color: string) => void
+  /** Provided only in multiplayer rooms. Falsy = single-player path. */
+  multiplayer?: MultiplayerConfig
 }
 
 export interface SpinnaCanvasHandle {
@@ -31,10 +62,12 @@ export interface SpinnaCanvasHandle {
   stop: () => void
   isRunning: () => boolean
   getStats: () => GameStats
+  /** Pose snapshot used by the room client for broadcasts. */
+  getCarState: () => { x: number; y: number; heading: number; omega: number } | null
 }
 
 const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
-  function SpinnaCanvas({ inputsRef, tuneRef, active, onBanner }, ref) {
+  function SpinnaCanvas({ inputsRef, tuneRef, active, onBanner, multiplayer }, ref) {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const stateRef = useRef<{
       car: CarPhysics | null
@@ -58,6 +91,9 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
       mode: string
       targets: Target[]
       targetsBanked: number
+      mpRingIdx: number
+      mpAccumulatedDeg: number
+      mpProposedIdx: number
     }>({
       car: null,
       cones: [],
@@ -80,6 +116,9 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
       mode: 'free',
       targets: [],
       targetsBanked: 0,
+      mpRingIdx: -1,
+      mpAccumulatedDeg: 0,
+      mpProposedIdx: -1,
     })
 
     useImperativeHandle(ref, () => ({
@@ -122,6 +161,9 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
         s.lastT = 0
         s.worldT = 0
         s.excitement = 0
+        s.mpRingIdx = -1
+        s.mpAccumulatedDeg = 0
+        s.mpProposedIdx = -1
 
         // Clear tire marks
         if (s.tireCanvas) {
@@ -169,6 +211,11 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
           targetsTotal: s.targets.length,
           targetProgress,
         }
+      },
+      getCarState() {
+        const c = stateRef.current.car
+        if (!c) return null
+        return { x: c.x, y: c.y, heading: c.heading, omega: c.omega }
       },
     }), [inputsRef])
 
@@ -274,14 +321,35 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
           cone.collideWith(car, s.sparks)
         }
 
-        // Targets (Target Hunt mode only)
-        if (s.targets.length > 0) {
+        if (multiplayer) {
+          // Multiplayer: a single server-authoritative ring at a time.
+          const ring = multiplayer.ringRef.current
+          if (ring) {
+            // Reset the accumulator if the server moved on to a new ring.
+            if (s.mpRingIdx !== ring.ringIdx) {
+              s.mpRingIdx = ring.ringIdx
+              s.mpAccumulatedDeg = 0
+            }
+            const dx = car.x - ring.x
+            const dy = car.y - ring.y
+            const inside = dx * dx + dy * dy < ring.captureR * ring.captureR
+            if (inside) {
+              const yaw = Math.abs(car.omega * dt) * (180 / Math.PI)
+              const slipping = Math.abs(car.slipAngleR) > 0.25 && Math.abs(car.omega) > 0.6
+              if (slipping) s.mpAccumulatedDeg += yaw
+              if (s.mpAccumulatedDeg >= 360 && s.mpProposedIdx !== ring.ringIdx) {
+                s.mpProposedIdx = ring.ringIdx
+                multiplayer.onRingComplete(ring.ringIdx)
+              }
+            }
+          }
+        } else if (s.targets.length > 0) {
+          // Single-player: local target set.
           updateTargets(s.targets, car, dt, (target) => {
             s.targetsBanked += 1
             const ringPayout = 7500
             s.score.score += ringPayout
             onBanner('RING!', `+R${ringPayout} · ${s.targetsBanked}/${s.targets.length}`, '#22c55e')
-            // small particle burst at the ring
             for (let i = 0; i < 18; i++) {
               const a = Math.random() * Math.PI * 2
               const sp = 90 + Math.random() * 120
@@ -294,7 +362,6 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
               })
             }
           })
-          // Re-spawn a fresh trio when all banked
           if (s.targets.every(t => t.hit)) {
             s.targets = makeTargetSet()
           }
@@ -346,10 +413,24 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
         ctx.drawImage(s.tireCanvas, 0, 0)
       }
 
-      // Target rings (Target Hunt mode) — drawn below the car so it can dip
-      // into them visually as it spins around.
-      if (s.mode === 'targets' && s.targets.length > 0) {
+      // Target rings — drawn below the car so it can dip into them visually
+      // as it spins around.
+      if (multiplayer) {
+        const ring = multiplayer.ringRef.current
+        if (ring) {
+          drawServerRing(ctx, ring, s.mpAccumulatedDeg, s.worldT)
+        }
+      } else if (s.mode === 'targets' && s.targets.length > 0) {
         drawTargets(ctx, s.targets)
+      }
+
+      // Opponents (multiplayer only) — drawn under the local car so the
+      // player's own ride stays visually dominant.
+      if (multiplayer) {
+        const opponents = multiplayer.opponentsRef.current ?? []
+        for (const op of opponents) {
+          drawOpponent(ctx, op)
+        }
       }
 
       // Smoke — ground-level layer (drawn under the car)
@@ -377,7 +458,7 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
 
       ctx.restore()
       ctx.restore()
-    }, [active, inputsRef, tuneRef, onBanner])
+    }, [active, inputsRef, tuneRef, onBanner, multiplayer])
 
     useEffect(() => {
       stateRef.current.raf = requestAnimationFrame(loop)
@@ -395,5 +476,53 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
     )
   }
 )
+
+// ─── Multiplayer draw helpers ────────────────────────────────────────────────
+
+function drawServerRing(
+  ctx: CanvasRenderingContext2D,
+  ring: ServerRing,
+  accumulated: number,
+  worldT: number,
+) {
+  const pulse = 0.6 + 0.4 * Math.sin(worldT * 4)
+  ctx.save()
+  ctx.translate(ring.x, ring.y)
+  // outer glow
+  ctx.strokeStyle = `rgba(34,197,94,${0.55 * pulse})`
+  ctx.lineWidth = 3
+  ctx.beginPath(); ctx.arc(0, 0, ring.r, 0, Math.PI * 2); ctx.stroke()
+  // capture radius (subtle)
+  ctx.strokeStyle = 'rgba(34,197,94,0.18)'
+  ctx.lineWidth = 1
+  ctx.beginPath(); ctx.arc(0, 0, ring.captureR, 0, Math.PI * 2); ctx.stroke()
+  // progress wedge
+  if (accumulated > 0) {
+    const pct = Math.min(1, accumulated / 360)
+    ctx.fillStyle = 'rgba(34,197,94,0.18)'
+    ctx.beginPath()
+    ctx.moveTo(0, 0)
+    ctx.arc(0, 0, ring.r * 0.9, -Math.PI / 2, -Math.PI / 2 + pct * Math.PI * 2)
+    ctx.closePath()
+    ctx.fill()
+  }
+  ctx.restore()
+}
+
+function drawOpponent(ctx: CanvasRenderingContext2D, op: OpponentPos) {
+  ctx.save()
+  ctx.translate(op.x, op.y)
+  ctx.rotate(op.heading)
+  // simple body — narrower than the player's own car, slightly faded
+  const w = 22, h = 56
+  ctx.globalAlpha = 0.7
+  ctx.fillStyle = 'rgba(0,0,0,0.5)'
+  ctx.beginPath(); ctx.ellipse(2, 4, w / 2 + 4, h / 2 + 4, 0, 0, Math.PI * 2); ctx.fill()
+  ctx.fillStyle = op.color ?? '#7c8593'
+  ctx.fillRect(-w / 2, -h / 2, w, h)
+  ctx.fillStyle = 'rgba(15,18,28,0.85)'
+  ctx.fillRect(-w / 2 + 3, -h / 2 + 14, w - 6, h - 30)
+  ctx.restore()
+}
 
 export default SpinnaCanvas
