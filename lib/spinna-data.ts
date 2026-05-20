@@ -1,24 +1,28 @@
-// Car list — enginePower spread is now 1.0× → ~5.4× across tiers, so the jump
-// from a tatty E30 to a 2JZ/GTR really feels like a different planet.
+// Car list — enginePower spread 1.0× → ~5.4× across tiers. Prices tuned so
+// the first upgrade takes 3–5 rounds and each successive jump gets harder.
+// Typical early round ≈ R7–12k from rings; tire wear keeps rounds short.
 export const CARS = [
   // Tier 1 — starter (baseline 1.0×)
   {id:"e30",name:"BMW E30 325i",tag:"BAVARIAN CLASSIC",mass:1180,wheelbase:42,front_overhang:8,rear_overhang:10,width:22,enginePower:13000,maxFwdSpeed:340,maxRevSpeed:95,inertiaMul:1.15,color:"#f4f4f1",accentColor:"M-stripe",price:0,owned:true,powerStat:0.30,gripStat:0.55,weightStat:0.45},
-  // Tier 2 — affordable street (~1.5×)
-  {id:"e36",name:"BMW E36 328i",tag:"M-TECH SHARK",mass:1320,wheelbase:46,front_overhang:9,rear_overhang:11,width:23,enginePower:19500,maxFwdSpeed:380,maxRevSpeed:100,inertiaMul:1.25,color:"#1a1a1a",accentColor:"M-stripe",price:8500,owned:false,powerStat:0.42,gripStat:0.5,weightStat:0.55},
-  {id:"cressida",name:"Toyota Cressida 2.4i",tag:"YARD KING",mass:1390,wheelbase:48,front_overhang:10,rear_overhang:12,width:23,enginePower:23000,maxFwdSpeed:400,maxRevSpeed:100,inertiaMul:1.3,color:"#7c2128",accentColor:"stripe",price:12000,owned:false,powerStat:0.48,gripStat:0.48,weightStat:0.58},
+  // Tier 2 — affordable street (~1.5×) — first upgrade target
+  {id:"e36",name:"BMW E36 328i",tag:"M-TECH SHARK",mass:1320,wheelbase:46,front_overhang:9,rear_overhang:11,width:23,enginePower:19500,maxFwdSpeed:380,maxRevSpeed:100,inertiaMul:1.25,color:"#1a1a1a",accentColor:"M-stripe",price:25000,owned:false,powerStat:0.42,gripStat:0.5,weightStat:0.55},
+  {id:"cressida",name:"Toyota Cressida 2.4i",tag:"YARD KING",mass:1390,wheelbase:48,front_overhang:10,rear_overhang:12,width:23,enginePower:23000,maxFwdSpeed:400,maxRevSpeed:100,inertiaMul:1.3,color:"#7c2128",accentColor:"stripe",price:50000,owned:false,powerStat:0.48,gripStat:0.48,weightStat:0.58},
   // Tier 3 — rotary / sport (~2.5×)
-  {id:"rx7",name:"Mazda RX-7 FC",tag:"ROTARY MONSTER",mass:1280,wheelbase:43,front_overhang:9,rear_overhang:9,width:22,enginePower:33000,maxFwdSpeed:450,maxRevSpeed:105,inertiaMul:0.95,color:"#fcd00b",accentColor:"stripe",price:18500,owned:false,powerStat:0.66,gripStat:0.45,weightStat:0.4},
-  {id:"e46",name:"BMW E46 M3",tag:"S54 SCREAMER",mass:1495,wheelbase:50,front_overhang:10,rear_overhang:12,width:24,enginePower:42000,maxFwdSpeed:475,maxRevSpeed:108,inertiaMul:1.1,color:"#2e5fa2",accentColor:"M-stripe",price:32000,owned:false,powerStat:0.78,gripStat:0.6,weightStat:0.65},
-  // Tier 4 — top-tier monsters (~4–5×)
-  {id:"supra",name:"Toyota Supra 2JZ",tag:"TURBO INFERNO",mass:1610,wheelbase:52,front_overhang:11,rear_overhang:13,width:25,enginePower:58000,maxFwdSpeed:510,maxRevSpeed:115,inertiaMul:1.05,color:"#cc3300",accentColor:"stripe",price:60000,owned:false,powerStat:0.92,gripStat:0.55,weightStat:0.7},
-  {id:"skyline",name:"Nissan Skyline GTR R34",tag:"GODZILLA",mass:1670,wheelbase:54,front_overhang:11,rear_overhang:13,width:25,enginePower:70000,maxFwdSpeed:540,maxRevSpeed:120,inertiaMul:1.0,color:"#23415c",accentColor:"M-stripe",price:95000,owned:false,powerStat:1.0,gripStat:0.7,weightStat:0.72},
+  {id:"rx7",name:"Mazda RX-7 FC",tag:"ROTARY MONSTER",mass:1280,wheelbase:43,front_overhang:9,rear_overhang:9,width:22,enginePower:33000,maxFwdSpeed:450,maxRevSpeed:105,inertiaMul:0.95,color:"#fcd00b",accentColor:"stripe",price:90000,owned:false,powerStat:0.66,gripStat:0.45,weightStat:0.4},
+  {id:"e46",name:"BMW E46 M3",tag:"S54 SCREAMER",mass:1495,wheelbase:50,front_overhang:10,rear_overhang:12,width:24,enginePower:42000,maxFwdSpeed:475,maxRevSpeed:108,inertiaMul:1.1,color:"#2e5fa2",accentColor:"M-stripe",price:150000,owned:false,powerStat:0.78,gripStat:0.6,weightStat:0.65},
+  // Tier 4 — top-tier monsters (~4–5×) — grind territory
+  {id:"supra",name:"Toyota Supra 2JZ",tag:"TURBO INFERNO",mass:1610,wheelbase:52,front_overhang:11,rear_overhang:13,width:25,enginePower:58000,maxFwdSpeed:510,maxRevSpeed:115,inertiaMul:1.05,color:"#cc3300",accentColor:"stripe",price:260000,owned:false,powerStat:0.92,gripStat:0.55,weightStat:0.7},
+  {id:"skyline",name:"Nissan Skyline GTR R34",tag:"GODZILLA",mass:1670,wheelbase:54,front_overhang:11,rear_overhang:13,width:25,enginePower:70000,maxFwdSpeed:540,maxRevSpeed:120,inertiaMul:1.0,color:"#23415c",accentColor:"M-stripe",price:420000,owned:false,powerStat:1.0,gripStat:0.7,weightStat:0.72},
 ]
 
+// Wear is now ~2× faster across the board, but tire choice changes things
+// more dramatically: a fresh set of sport rubber lasts roughly 3× a budget set
+// AND grips meaningfully better, while slicks are stickier but disposable.
 export const TIRES = [
-  {id:"used",name:"USED CHINESES",desc:"Last legs. Cheap.",gripLong:0.55,gripLat:0.5,durability:280,wearMul:1.6,price:120,gripStat:0.3,lifeStat:0.2},
-  {id:"budget",name:"BUDGET ALL-SEASON",desc:"Honest rubber, fair life.",gripLong:0.78,gripLat:0.74,durability:520,wearMul:1,price:480,gripStat:0.55,lifeStat:0.55},
-  {id:"sport",name:"PERFORMANCE SPORT",desc:"Sticky on tar, lasts.",gripLong:0.95,gripLat:0.95,durability:780,wearMul:0.85,price:1200,gripStat:0.85,lifeStat:0.85},
-  {id:"slick",name:"BURNER SEMI-SLICKS",desc:"Heavenly grip, gone fast.",gripLong:1.1,gripLat:1.1,durability:340,wearMul:1.9,price:900,gripStat:1,lifeStat:0.3},
+  {id:"used",name:"USED CHINESES",desc:"Last legs. Sloppy in every direction.",gripLong:0.45,gripLat:0.40,durability:150,wearMul:1.6,price:120,gripStat:0.2,lifeStat:0.15},
+  {id:"budget",name:"BUDGET ALL-SEASON",desc:"Honest rubber. Wears in a few hot laps.",gripLong:0.78,gripLat:0.74,durability:260,wearMul:1,price:480,gripStat:0.5,lifeStat:0.5},
+  {id:"sport",name:"PERFORMANCE SPORT",desc:"Sticky on tar — lasts about 3× a budget set.",gripLong:1.05,gripLat:1.05,durability:780,wearMul:0.85,price:1200,gripStat:0.85,lifeStat:0.95},
+  {id:"slick",name:"BURNER SEMI-SLICKS",desc:"Heavenly grip, gone fast.",gripLong:1.2,gripLat:1.2,durability:220,wearMul:1.9,price:900,gripStat:1,lifeStat:0.25},
 ]
 
 export const SAVE_KEY = "spinna_save_v3"
@@ -27,7 +31,7 @@ export const CANVAS_W = 750
 export const CANVAS_H = 750
 export const ARENA = {l:80,t:80,r:1420,b:1420}
 
-export const DEFAULT_SAVE = {money:5000,car:"e30",ownedCars:["e30"],tires:"budget",tireHealth:100,bestPayout:0,bestScore:0,totalLifetimeRands:0,track:"donut",mode:"free"}
+export const DEFAULT_SAVE = {money:1500,car:"e30",ownedCars:["e30"],tires:"budget",tireHealth:100,bestPayout:0,bestScore:0,totalLifetimeRands:0,track:"donut",mode:"free"}
 
 export interface GameMode {
   id: string

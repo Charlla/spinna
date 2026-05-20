@@ -96,7 +96,9 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
 
         // Mode-specific setup
         s.mode = mode
-        s.targets = mode === 'targets' ? makeTargetSet() : []
+        // Rings are the primary cash source — spawn a fresh trio in every
+        // mode (Target Hunt just leaves the rest of the UI tuned around them).
+        s.targets = makeTargetSet()
         s.targetsBanked = 0
 
         s.car = new CarPhysics(carDef, tireDef, tireHealth)
@@ -133,6 +135,9 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
           inputsRef.current.hbrk = false
         }
 
+        // Audio is initialised on demand by setAudioEnabled() from the menu.
+        // Calling initAudio()/resumeAudio() here is safe — both no-op when
+        // disabled and warm the context once enabled.
         initAudio()
         resumeAudio()
       },
@@ -270,15 +275,12 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
         }
 
         // Targets (Target Hunt mode only)
-        if (s.mode === 'targets' && s.targets.length > 0) {
+        if (s.targets.length > 0) {
           updateTargets(s.targets, car, dt, (target) => {
             s.targetsBanked += 1
-            s.score.score += 4500
-            // Fire a milestone banner via the onBanner callback below; we can
-            // hijack it here since we have the ref. But we don't — the parent
-            // handles banners through updateScore. Simplest: temporarily set
-            // a synthetic milestone by directly invoking onBanner via state.
-            onBanner('RING!', `+R4500 · ${s.targetsBanked}/${s.targets.length}`, '#22c55e')
+            const ringPayout = 7500
+            s.score.score += ringPayout
+            onBanner('RING!', `+R${ringPayout} · ${s.targetsBanked}/${s.targets.length}`, '#22c55e')
             // small particle burst at the ring
             for (let i = 0; i < 18; i++) {
               const a = Math.random() * Math.PI * 2

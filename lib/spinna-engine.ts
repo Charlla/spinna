@@ -452,7 +452,7 @@ export interface Target {
 }
 
 const TARGET_GOAL_DEG = 330  // ~one full lap to bank a target
-const TARGET_BONUS_POINTS = 4500
+const TARGET_BONUS_POINTS = 7500  // Rings are now the primary cash source
 
 export function makeTargetSet(): Target[] {
   // Three rings on a randomised pattern, kept well inside the arena.
@@ -719,7 +719,8 @@ export function updateScore(
     const edgeBonus = 1 + 2 * clamp(1 - (edgeDist - 30) / 190, 0, 1)
     const points = degThisFrame * state.mult * (1 + driftBonus) * edgeBonus
     state.comboDeg += degThisFrame
-    state.score += Math.floor(1.4 * points)
+    // Freestyle spins now sprinkle small change — rings are the main payout.
+    state.score += Math.floor(0.5 * points)
     state.comboIdleT = 0
 
     // Milestone checks
@@ -1263,22 +1264,36 @@ function drawShisaNyama(ctx: CanvasRenderingContext2D) {
 }
 
 // ─── Audio ───────────────────────────────────────────────────────────────────
+// Engine-only (no tire screech). Sound is OFF by default — the player opts in
+// via setAudioEnabled(true) from the pause menu.
 interface AudioState {
   ctx: AudioContext
   master: GainNode
   engineOsc: OscillatorNode
   engineGain: GainNode
-  vibLfo: OscillatorNode
-  squealFilter: BiquadFilterNode
-  squealGain: GainNode
 }
 
 let audio: AudioState | null = null
+let audioEnabled = false
 let lastBoomTime = 0
 let lastUpdateTime = 0
 
+export function isAudioEnabled() { return audioEnabled }
+
+export function setAudioEnabled(on: boolean): boolean {
+  audioEnabled = on
+  if (on) {
+    initAudio()
+    resumeAudio()
+  } else {
+    stopAudio()
+  }
+  return audioEnabled
+}
+
 export function initAudio() {
   if (audio) return
+  if (!audioEnabled) return
   const AudioCtx = (window as typeof window & { webkitAudioContext?: typeof AudioContext }).AudioContext ||
     (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
   if (!AudioCtx) return
@@ -1298,31 +1313,7 @@ export function initAudio() {
     engineGain.connect(master)
     engineOsc.start()
 
-    // Vib LFO
-    const vibLfo = ctx.createOscillator()
-    vibLfo.frequency.value = 8
-    vibLfo.type = 'sine'
-    vibLfo.start()
-
-    // Squeal
-    const buf = ctx.createBuffer(1, ctx.sampleRate * 0.5, ctx.sampleRate)
-    const data = buf.getChannelData(0)
-    for (let i = 0; i < data.length; i++) data[i] = 2 * Math.random() - 1
-    const squealSrc = ctx.createBufferSource()
-    squealSrc.buffer = buf
-    squealSrc.loop = true
-    const squealFilter = ctx.createBiquadFilter()
-    squealFilter.type = 'bandpass'
-    squealFilter.frequency.value = 2400
-    squealFilter.Q.value = 14
-    const squealGain = ctx.createGain()
-    squealGain.gain.value = 0
-    squealSrc.connect(squealFilter)
-    squealFilter.connect(squealGain)
-    squealGain.connect(master)
-    squealSrc.start()
-
-    audio = { ctx, master, engineOsc, engineGain, vibLfo, squealFilter, squealGain }
+    audio = { ctx, master, engineOsc, engineGain }
   } catch {
     audio = null
   }
@@ -1337,12 +1328,10 @@ export function stopAudio() {
   const t = audio.ctx.currentTime
   audio.engineGain.gain.cancelScheduledValues(t)
   audio.engineGain.gain.setTargetAtTime(0, t, 0.15)
-  audio.squealGain.gain.cancelScheduledValues(t)
-  audio.squealGain.gain.setTargetAtTime(0, t, 0.1)
 }
 
 export function updateAudio(car: CarPhysics) {
-  if (!audio) return
+  if (!audio || !audioEnabled) return
   const t = audio.ctx.currentTime
   if (t - lastUpdateTime < 0.08) return
   lastUpdateTime = t
@@ -1352,14 +1341,10 @@ export function updateAudio(car: CarPhysics) {
   audio.engineOsc.frequency.setTargetAtTime(baseFreq, t, 0.06)
   const engineVol = clamp(0.05 + (spd / 300 + Math.abs(car.throttleIn)) * 0.35, 0, 0.8)
   audio.engineGain.gain.setTargetAtTime(engineVol, t, 0.04)
-
-  const squealIntensity = clamp(Math.abs(car.slipAngleR) * 1.5 + car.wheelspin * 0.8, 0, 1)
-  audio.squealFilter.frequency.setTargetAtTime(1800 + squealIntensity * 1400, t, 0.04)
-  audio.squealGain.gain.setTargetAtTime(squealIntensity * 0.6, t, 0.04)
 }
 
 export function playBoom() {
-  if (!audio) return
+  if (!audio || !audioEnabled) return
   const t = audio.ctx.currentTime
   if (t - lastBoomTime < 0.08) return
   lastBoomTime = t
@@ -1378,7 +1363,7 @@ export function playBoom() {
 }
 
 export function playCashOut() {
-  if (!audio) return
+  if (!audio || !audioEnabled) return
   const t = audio.ctx.currentTime
   const freqs = [523, 659, 784, 1046]
   freqs.forEach((freq, i) => {

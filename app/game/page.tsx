@@ -10,6 +10,7 @@ import SpinnaTunePanel from '@/components/spinna-tune-panel'
 import PauseOverlay from '@/components/games/PauseOverlay'
 import NeonButton from '@/components/games/NeonButton'
 import { SpinnaCanvasHandle } from '@/components/spinna-canvas'
+import { setAudioEnabled } from '@/lib/spinna-engine'
 import { SAVE_KEY, TUNE_KEY, DEFAULT_SAVE, DEFAULT_TUNE, SaveData, TuneData, GameStats } from '@/lib/spinna-data'
 
 // Load canvas client-side only (uses browser APIs)
@@ -44,6 +45,7 @@ export default function GamePage() {
   const [result, setResult] = useState<GameResult | null>(null)
   const [resetKey] = useState(0)
   const [started, setStarted] = useState(false)
+  const [soundOn, setSoundOn] = useState(false)
   const [player, setPlayer] = useState<{ username: string } | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -228,14 +230,24 @@ export default function GamePage() {
             title="PAUSED"
             onResume={() => setMenuOpen(false)}
             extra={
-              <NeonButton
-                variant="primary"
-                size="md"
-                fullWidth
-                onClick={() => { setMenuOpen(false); handleCashOut() }}
-              >
-                Cash out
-              </NeonButton>
+              <>
+                <NeonButton
+                  variant="primary"
+                  size="md"
+                  fullWidth
+                  onClick={() => { setMenuOpen(false); handleCashOut() }}
+                >
+                  Cash out
+                </NeonButton>
+                <NeonButton
+                  variant="ghost"
+                  size="md"
+                  fullWidth
+                  onClick={() => setSoundOn(prev => setAudioEnabled(!prev))}
+                >
+                  Sound: {soundOn ? 'ON' : 'OFF'}
+                </NeonButton>
+              </>
             }
             onSettings={() => { setMenuOpen(false); openTune() }}
             onQuit={() => { setMenuOpen(false); handleExit() }}
