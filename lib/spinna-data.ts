@@ -45,11 +45,25 @@ export interface GameMode {
 
 export const GAME_MODES: GameMode[] = [
   {
+    id: 'targets',
+    name: 'TARGET HUNT',
+    subtitle: 'Spin around the rings',
+    description: 'Solo. Glowing rings spawn — spin tight circles for fat bonuses.',
+    accent: '#22c55e',
+  },
+  {
     id: 'multiplayer',
     name: 'MULTIPLAYER',
-    subtitle: 'Spin against your buddies',
+    subtitle: 'Spin against your buddies online',
     description: 'Online rooms. First to circle a ring banks it. Needs a Spit Wars account to host.',
     accent: '#ef4444',
+  },
+  {
+    id: 'passplay',
+    name: 'PASS & PLAY',
+    subtitle: 'Hotseat with up to 6 mates',
+    description: '60s each. Same car for everyone. Pass the device between rounds and watch the leaderboard.',
+    accent: '#a855f7',
   },
   {
     id: 'free',
@@ -57,13 +71,6 @@ export const GAME_MODES: GameMode[] = [
     subtitle: 'OG donut session',
     description: 'Burn rubber, rack up combo degrees. Just send it.',
     accent: '#fcd00b',
-  },
-  {
-    id: 'targets',
-    name: 'TARGET HUNT',
-    subtitle: 'Spin around the rings',
-    description: 'Solo. Glowing rings spawn — spin tight circles for fat bonuses.',
-    accent: '#22c55e',
   },
 ]
 

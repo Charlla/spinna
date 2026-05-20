@@ -72,7 +72,16 @@ export default function Home() {
   }
 
   if (showIntro) {
-    return <SpinnaIntro onStart={() => setShowIntro(false)} />
+    return (
+      <SpinnaIntro
+        onStart={(modeId) => {
+          if (modeId === 'multiplayer') { router.push('/online'); return }
+          if (modeId === 'passplay') { router.push('/passplay'); return }
+          handleSave({ ...save, mode: modeId })
+          setShowIntro(false)
+        }}
+      />
+    )
   }
 
   return (
