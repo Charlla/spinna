@@ -420,7 +420,9 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
         if (ring) {
           drawServerRing(ctx, ring, s.mpAccumulatedDeg, s.worldT)
         }
-      } else if (s.mode === 'targets' && s.targets.length > 0) {
+      } else if (s.targets.length > 0) {
+        // Rings now spawn in every single-player mode (target hunt, free
+        // spin, pass & play) since they're the primary cash source.
         drawTargets(ctx, s.targets)
       }
 
@@ -457,6 +459,19 @@ const SpinnaCanvas = forwardRef<SpinnaCanvasHandle, SpinnaCanvasProps>(
       drawCrowd(ctx, s.crowd, s.worldT, s.excitement)
 
       ctx.restore()
+      // ─── Screen-space overlays ──────────────────────────────────────────────
+      // Edge-of-viewport pointers for any active ring that's off-screen.
+      // Works for the multiplayer server ring AND the local target set.
+      const screenRings: Array<{ x: number; y: number }> = []
+      if (multiplayer) {
+        const r = multiplayer.ringRef.current
+        if (r) screenRings.push({ x: r.x, y: r.y })
+      } else {
+        for (const t of s.targets) if (!t.hit) screenRings.push({ x: t.x, y: t.y })
+      }
+      if (screenRings.length > 0) {
+        drawEdgePointers(ctx, W, H, screenRings, scale, viewX, viewY)
+      }
       ctx.restore()
     }, [active, inputsRef, tuneRef, onBanner, multiplayer])
 
@@ -507,6 +522,64 @@ function drawServerRing(
     ctx.fill()
   }
   ctx.restore()
+}
+
+/**
+ * Edge-of-viewport pointers — tiny arrows that hug the canvas border and point
+ * toward any ring that's currently off-screen. Drawn in screen-space (after
+ * the world ctx.restore()).
+ */
+function drawEdgePointers(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  rings: Array<{ x: number; y: number }>,
+  scale: number,
+  viewX: number,
+  viewY: number,
+) {
+  const cx = W / 2
+  const cy = H / 2
+  const inset = 22
+  const halfW = W / 2 - inset
+  const halfH = H / 2 - inset
+  for (const r of rings) {
+    const sx = r.x * scale - viewX
+    const sy = r.y * scale - viewY
+    const dx = sx - cx
+    const dy = sy - cy
+    // Already on-screen with a generous margin? Skip.
+    if (
+      sx > inset && sx < W - inset &&
+      sy > inset && sy < H - inset
+    ) continue
+    const k = Math.max(Math.abs(dx) / halfW, Math.abs(dy) / halfH)
+    if (k <= 0) continue
+    const ex = cx + dx / k
+    const ey = cy + dy / k
+    const angle = Math.atan2(dy, dx)
+    ctx.save()
+    ctx.translate(ex, ey)
+    ctx.rotate(angle)
+    // Triangle pointer
+    ctx.fillStyle = 'rgba(34,197,94,0.92)'
+    ctx.shadowColor = 'rgba(34,197,94,0.7)'
+    ctx.shadowBlur = 8
+    ctx.beginPath()
+    ctx.moveTo(0, 0)
+    ctx.lineTo(-11, -6)
+    ctx.lineTo(-7, 0)
+    ctx.lineTo(-11, 6)
+    ctx.closePath()
+    ctx.fill()
+    ctx.shadowBlur = 0
+    // Subtle dot behind
+    ctx.fillStyle = 'rgba(34,197,94,0.35)'
+    ctx.beginPath()
+    ctx.arc(-14, 0, 2, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+  }
 }
 
 function drawOpponent(ctx: CanvasRenderingContext2D, op: OpponentPos) {

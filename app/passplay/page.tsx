@@ -14,6 +14,8 @@ import {
   DEFAULT_SAVE,
   SAVE_KEY,
   applyUpgrades,
+  type Car,
+  type Tire,
   type SaveData,
   type TuneData,
   type GameStats,
@@ -169,7 +171,7 @@ function SetupView({
   onRemove: (i: number) => void
   startable: boolean
   onStart: () => void
-  ownedCars: { id: string; name: string; tag: string }[]
+  ownedCars: Car[]
   ownedUpgrades: { id: string; name: string; tag: string }[]
   carId: string
   setCarId: (id: string) => void
@@ -219,32 +221,31 @@ function SetupView({
           )}
         </section>
 
-        <section>
-          <div className="text-[9px] tracking-[4px] font-mono text-white/45 uppercase mb-2">Shared ride</div>
-          <label className="block text-[9px] tracking-[3px] font-mono text-white/50 mb-1 mt-2">Car</label>
-          <select
-            value={carId}
-            onChange={(e) => setCarId(e.target.value)}
-            className="w-full rounded-lg border border-white/15 bg-black/40 px-3 py-2 font-mono text-white outline-none focus:border-amber-400/60"
-          >
-            {ownedCars.map(c => (
-              <option key={c.id} value={c.id}>{c.name} · {c.tag}</option>
-            ))}
-          </select>
-
-          <label className="block text-[9px] tracking-[3px] font-mono text-white/50 mb-1 mt-3">Tyres (fresh set every turn)</label>
-          <select
-            value={tireId}
-            onChange={(e) => setTireId(e.target.value)}
-            className="w-full rounded-lg border border-white/15 bg-black/40 px-3 py-2 font-mono text-white outline-none focus:border-amber-400/60"
-          >
-            {TIRES.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
+        <section className="space-y-3">
+          <div className="text-[9px] tracking-[4px] font-mono text-white/45 uppercase">Shared ride</div>
+          <SpinnerPicker
+            label="Car"
+            items={ownedCars}
+            valueId={carId}
+            onChange={setCarId}
+            renderHero={(c) => <MiniCarPreview car={c as Car} />}
+            renderTitle={(c) => (c as Car).name}
+            renderTag={(c) => (c as Car).tag}
+            accent="#fcd00b"
+          />
+          <SpinnerPicker
+            label="Tyres · fresh set every turn"
+            items={TIRES.map(t => ({ ...t }))}
+            valueId={tireId}
+            onChange={setTireId}
+            renderHero={(t) => <MiniTirePreview tire={t as Tire} />}
+            renderTitle={(t) => (t as Tire).name}
+            renderTag={(t) => `Life ${Math.round(((t as Tire).lifeStat) * 100)}% · Grip ${Math.round(((t as Tire).gripStat) * 100)}%`}
+            accent="#22c55e"
+          />
 
           {ownedUpgrades.length > 0 && (
-            <>
+            <div>
               <label className="block text-[9px] tracking-[3px] font-mono text-white/50 mb-1 mt-3">Mods (your owned set)</label>
               <div className="flex flex-wrap gap-1.5">
                 {ownedUpgrades.map(u => {
@@ -264,7 +265,7 @@ function SetupView({
                   )
                 })}
               </div>
-            </>
+            </div>
           )}
         </section>
 
@@ -283,6 +284,132 @@ function SetupView({
         </div>
       </div>
     </main>
+  )
+}
+
+// ─── Carousel picker — same visual language as the garage ──────────────────
+function SpinnerPicker<T extends { id: string }>({
+  label, items, valueId, onChange, renderHero, renderTitle, renderTag, accent,
+}: {
+  label: string
+  items: T[]
+  valueId: string
+  onChange: (id: string) => void
+  renderHero: (item: T) => React.ReactNode
+  renderTitle: (item: T) => string
+  renderTag: (item: T) => string
+  accent: string
+}) {
+  const safeIdx = Math.max(0, items.findIndex(i => i.id === valueId))
+  const idx = safeIdx < 0 ? 0 : safeIdx
+  const item = items[idx]
+  const go = (delta: number) => {
+    const n = items.length
+    if (n === 0) return
+    const next = (idx + delta + n) % n
+    onChange(items[next].id)
+  }
+  if (!item) return null
+  return (
+    <div
+      className="relative rounded-xl border bg-gradient-to-b from-black/70 via-black/60 to-black/80 backdrop-blur-md overflow-hidden px-3 py-3"
+      style={{ borderColor: `${accent}33`, boxShadow: `0 0 18px ${accent}1a` }}
+    >
+      <div
+        className="absolute inset-x-0 top-0 h-20 pointer-events-none"
+        style={{ background: `radial-gradient(circle at 50% 0%, ${accent}1f, transparent 65%)` }}
+      />
+      <div className="text-[8px] tracking-[4px] font-mono uppercase" style={{ color: `${accent}cc` }}>
+        {label}
+      </div>
+      <div className="flex justify-center gap-1 mt-1.5 mb-1">
+        {items.map((it, i) => (
+          <span
+            key={it.id}
+            className="w-1.5 h-1.5 rounded-full transition-all"
+            style={{
+              backgroundColor: i === idx ? accent : 'rgba(255,255,255,0.18)',
+              transform: i === idx ? 'scale(1.4)' : 'scale(1)',
+            }}
+          />
+        ))}
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => go(-1)}
+          aria-label="Previous"
+          className="shrink-0 w-9 h-12 rounded-md border border-white/10 bg-black/40 hover:bg-black/60 transition flex items-center justify-center text-white/60 hover:text-amber-300 text-xl"
+        >
+          ‹
+        </button>
+        <div className="flex-1 flex items-center gap-3 min-w-0">
+          <div className="shrink-0">{renderHero(item)}</div>
+          <div className="min-w-0">
+            <div className="font-mono font-extrabold text-white text-base leading-tight truncate">
+              {renderTitle(item)}
+            </div>
+            <div className="text-[10px] font-mono text-white/55 leading-tight truncate mt-0.5">
+              {renderTag(item)}
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={() => go(1)}
+          aria-label="Next"
+          className="shrink-0 w-9 h-12 rounded-md border border-white/10 bg-black/40 hover:bg-black/60 transition flex items-center justify-center text-white/60 hover:text-amber-300 text-xl"
+        >
+          ›
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function MiniCarPreview({ car }: { car: Car }) {
+  return (
+    <svg width="36" height="56" viewBox="0 0 100 155" aria-hidden="true">
+      <rect x="6" y="2" width="88" height="151" rx="8" fill={car.color} />
+      {car.accentColor === 'M-stripe' && (
+        <>
+          <rect x="6" y="68" width="88" height="4" fill="#1c69d4" />
+          <rect x="6" y="72" width="88" height="4" fill="#3e1f7d" />
+          <rect x="6" y="76" width="88" height="4" fill="#e30613" />
+        </>
+      )}
+      {car.accentColor === 'stripe' && (
+        <rect x="6" y="72" width="88" height="6" fill="#0a0a0a" />
+      )}
+      <polygon points="12,18 88,18 84,30 16,30" fill="rgba(15,18,28,0.92)" />
+      <polygon points="16,130 84,130 88,141 12,141" fill="rgba(15,18,28,0.92)" />
+      <rect x="2" y="30" width="8" height="14" fill="#0a0a0a" />
+      <rect x="90" y="30" width="8" height="14" fill="#0a0a0a" />
+      <rect x="2" y="116" width="8" height="14" fill="#0a0a0a" />
+      <rect x="90" y="116" width="8" height="14" fill="#0a0a0a" />
+    </svg>
+  )
+}
+
+function MiniTirePreview({ tire }: { tire: Tire }) {
+  // Colour shifts with grip — yellower for cheap, greener for sticky.
+  const hue = Math.min(140, Math.max(40, Math.round(40 + tire.gripStat * 100)))
+  return (
+    <svg width="48" height="48" viewBox="0 0 56 56" aria-hidden="true">
+      <circle cx="28" cy="28" r="22" fill="#0a0a0a" stroke={`hsl(${hue} 85% 55%)`} strokeWidth="2" />
+      <circle cx="28" cy="28" r="13" fill="#1a1a20" stroke="rgba(255,255,255,0.25)" strokeWidth="1" />
+      {[0, 1, 2, 3, 4].map(i => {
+        const a = (i / 5) * Math.PI * 2 - Math.PI / 2
+        return (
+          <line
+            key={i}
+            x1="28" y1="28"
+            x2={28 + Math.cos(a) * 12}
+            y2={28 + Math.sin(a) * 12}
+            stroke="#3a3a44" strokeWidth="2.5"
+          />
+        )
+      })}
+      <circle cx="28" cy="28" r="2.5" fill={`hsl(${hue} 85% 55%)`} />
+    </svg>
   )
 }
 
