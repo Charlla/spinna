@@ -15,14 +15,16 @@ export const CARS = [
   {id:"skyline",name:"Nissan Skyline GTR R34",tag:"GODZILLA",mass:1670,wheelbase:54,front_overhang:11,rear_overhang:13,width:25,enginePower:70000,maxFwdSpeed:540,maxRevSpeed:120,inertiaMul:1.0,color:"#23415c",accentColor:"M-stripe",price:420000,owned:false,powerStat:1.0,gripStat:0.7,weightStat:0.72},
 ]
 
-// Wear is now ~2× faster across the board, but tire choice changes things
-// more dramatically: a fresh set of sport rubber lasts roughly 3× a budget set
-// AND grips meaningfully better, while slicks are stickier but disposable.
+// Tire choice is mostly about HOW LONG the rubber lasts, not how it grips.
+// Compressed grip delta (0.95..1.10) means every set is drivable — the e36
+// on Performance Sport is the reference feel, and the others sit close to
+// it. Durability is where the big spread lives: used Chineses die ~4×
+// faster than budget; sport lasts ~3× budget.
 export const TIRES = [
-  {id:"used",name:"USED CHINESES",desc:"Tired rubber — soft and sloppy, but still drivable.",gripLong:0.62,gripLat:0.58,durability:160,wearMul:1.55,price:120,gripStat:0.3,lifeStat:0.2},
-  {id:"budget",name:"BUDGET ALL-SEASON",desc:"Honest rubber. Wears in a few hot laps.",gripLong:0.78,gripLat:0.74,durability:260,wearMul:1,price:480,gripStat:0.5,lifeStat:0.5},
-  {id:"sport",name:"PERFORMANCE SPORT",desc:"Sticky on tar — lasts about 3× a budget set.",gripLong:1.05,gripLat:1.05,durability:780,wearMul:0.85,price:1200,gripStat:0.85,lifeStat:0.95},
-  {id:"slick",name:"BURNER SEMI-SLICKS",desc:"Heavenly grip, gone fast.",gripLong:1.2,gripLat:1.2,durability:220,wearMul:1.9,price:900,gripStat:1,lifeStat:0.25},
+  {id:"used",name:"USED CHINESES",desc:"Tired rubber — drives almost the same, just dies fast.",gripLong:0.95,gripLat:0.93,durability:90,wearMul:1.4,price:120,gripStat:0.4,lifeStat:0.1},
+  {id:"budget",name:"BUDGET ALL-SEASON",desc:"Honest rubber. Fair life, neutral feel.",gripLong:1.0,gripLat:0.98,durability:240,wearMul:1.0,price:480,gripStat:0.55,lifeStat:0.4},
+  {id:"sport",name:"PERFORMANCE SPORT",desc:"The baseline. Sticky and long-lasting.",gripLong:1.05,gripLat:1.05,durability:760,wearMul:0.85,price:1200,gripStat:0.85,lifeStat:1.0},
+  {id:"slick",name:"BURNER SEMI-SLICKS",desc:"A hair stickier than sports, gone fast.",gripLong:1.10,gripLat:1.10,durability:180,wearMul:1.9,price:900,gripStat:1.0,lifeStat:0.2},
 ]
 
 export const SAVE_KEY = "spinna_save_v3"
@@ -43,6 +45,13 @@ export interface GameMode {
 
 export const GAME_MODES: GameMode[] = [
   {
+    id: 'multiplayer',
+    name: 'MULTIPLAYER',
+    subtitle: 'Spin against your buddies',
+    description: 'Online rooms. First to circle a ring banks it. Needs a Spit Wars account to host.',
+    accent: '#ef4444',
+  },
+  {
     id: 'free',
     name: 'FREE SPIN',
     subtitle: 'OG donut session',
@@ -53,7 +62,7 @@ export const GAME_MODES: GameMode[] = [
     id: 'targets',
     name: 'TARGET HUNT',
     subtitle: 'Spin around the rings',
-    description: 'Glowing rings spawn around the arena — spin tight circles around them for fat bonuses. New set when you bag all three.',
+    description: 'Solo. Glowing rings spawn — spin tight circles for fat bonuses.',
     accent: '#22c55e',
   },
 ]

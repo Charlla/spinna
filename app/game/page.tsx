@@ -223,6 +223,23 @@ export default function GamePage() {
                   variant="ghost"
                   size="md"
                   fullWidth
+                  onClick={() => {
+                    // Drop the saved mode so the garage opens straight on the mode picker.
+                    try {
+                      const raw = localStorage.getItem(SAVE_KEY)
+                      const cur = raw ? JSON.parse(raw) : {}
+                      localStorage.setItem(SAVE_KEY, JSON.stringify({ ...cur, mode: '' }))
+                    } catch { /* ignore */ }
+                    canvasRef.current?.stop()
+                    router.push('/')
+                  }}
+                >
+                  Change mode
+                </NeonButton>
+                <NeonButton
+                  variant="ghost"
+                  size="md"
+                  fullWidth
                   onClick={() => setSoundOn(prev => setAudioEnabled(!prev))}
                 >
                   Sound: {soundOn ? 'ON' : 'OFF'}

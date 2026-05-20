@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { CARS, TIRES, TRACKS, GAME_MODES, UPGRADES, SaveData, Car, Tire, Track, UpgradeDef } from '@/lib/spinna-data'
+import { useRouter } from 'next/navigation'
+import { CARS, TIRES, TRACKS, GAME_MODES, UPGRADES, SaveData, Car, Tire, Track, UpgradeDef, type GameMode } from '@/lib/spinna-data'
 
 interface SpinnaGarageProps {
   save: SaveData
@@ -12,9 +13,9 @@ interface SpinnaGarageProps {
   onLogout: () => void
 }
 
-type Step = 'car' | 'tires' | 'upgrades' | 'track' | 'spin'
-const STEPS: Step[] = ['car', 'tires', 'upgrades', 'track', 'spin']
-const STEP_LABEL: Record<Step, string> = { car: 'Ride', tires: 'Tyres', upgrades: 'Mods', track: 'Track', spin: 'Go' }
+type Step = 'mode' | 'car' | 'tires' | 'upgrades' | 'track' | 'spin'
+const STEPS: Step[] = ['mode', 'car', 'tires', 'upgrades', 'track', 'spin']
+const STEP_LABEL: Record<Step, string> = { mode: 'Mode', car: 'Ride', tires: 'Tyres', upgrades: 'Mods', track: 'Track', spin: 'Go' }
 
 function StatBar({ value, color = '#fcd00b' }: { value: number; color?: string }) {
   return (
@@ -630,8 +631,92 @@ function effectsSummary(effects: UpgradeDef['effects']): string {
   return parts.join(' · ')
 }
 
-function UpgradeList({
-  upgrades, ownedIds, equippedIds, money, onBuy, onToggle,
+// ─── Mode picker (front-most screen) ────────────────────────────────────────
+function ModeGlyph({ id, color }: { id: string; color: string }) {
+  // Tiny glyphs for each mode — saved as an inline SVG to keep tree shaking
+  // happy and avoid an extra asset request.
+  if (id === 'multiplayer') {
+    return (
+      <svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true">
+        <circle cx="20" cy="22" r="9" fill={color} opacity="0.92" />
+        <circle cx="36" cy="22" r="9" fill={color} opacity="0.55" />
+        <path d="M6 46c0-8 6-13 14-13s14 5 14 13" fill={color} opacity="0.92" />
+        <path d="M22 46c0-8 6-13 14-13s14 5 14 13" fill={color} opacity="0.55" />
+      </svg>
+    )
+  }
+  if (id === 'free') {
+    return (
+      <svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true">
+        <circle cx="28" cy="28" r="20" fill="none" stroke={color} strokeWidth="3" strokeDasharray="6 5" />
+        <circle cx="28" cy="28" r="3" fill={color} />
+      </svg>
+    )
+  }
+  // targets
+  return (
+    <svg width="56" height="56" viewBox="0 0 56 56" aria-hidden="true">
+      <circle cx="28" cy="28" r="22" fill="none" stroke={color} strokeWidth="2.5" />
+      <circle cx="28" cy="28" r="14" fill="none" stroke={color} strokeWidth="2.5" opacity="0.7" />
+      <circle cx="28" cy="28" r="6" fill={color} />
+    </svg>
+  )
+}
+
+function ModePicker({
+  modes, currentId, onPick,
+}: {
+  modes: GameMode[]
+  currentId: string | undefined
+  onPick: (m: GameMode) => void
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="text-[9px] tracking-[4px] font-mono text-white/45 uppercase text-center">
+        Pick how you spin
+      </div>
+      <div className="space-y-3">
+        {modes.map(m => {
+          const active = currentId === m.id
+          return (
+            <button
+              key={m.id}
+              onClick={() => onPick(m)}
+              className="w-full text-left rounded-xl border bg-gradient-to-b from-black/60 via-black/70 to-black/85 backdrop-blur-md p-4 flex items-center gap-4 transition active:scale-[0.99]"
+              style={{
+                borderColor: active ? m.accent : `${m.accent}33`,
+                boxShadow: active ? `0 0 24px ${m.accent}40` : `0 0 0 transparent`,
+                background: active
+                  ? `linear-gradient(to bottom, ${m.accent}26, rgba(0,0,0,0.7), rgba(0,0,0,0.85))`
+                  : undefined,
+              }}
+            >
+              <div className="shrink-0 rounded-lg p-1.5" style={{ background: `${m.accent}1a`, border: `1px solid ${m.accent}33` }}>
+                <ModeGlyph id={m.id} color={m.accent} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[9px] tracking-[4px] font-mono uppercase" style={{ color: m.accent }}>
+                  {m.subtitle}
+                </div>
+                <div className="font-mono font-extrabold text-white text-lg tracking-wide leading-tight mt-0.5">
+                  {m.name}
+                </div>
+                <div className="text-[10px] font-mono text-white/60 mt-1 leading-snug">
+                  {m.description}
+                </div>
+              </div>
+              <div className="shrink-0 text-2xl font-mono font-bold" style={{ color: m.accent }}>›</div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Upgrades carousel — focused single mod with arrows ─────────────────────
+function UpgradeCarousel({
+  upgrades, ownedIds, equippedIds, money, onBuy, onToggle, onContinue,
 }: {
   upgrades: UpgradeDef[]
   ownedIds: string[]
@@ -639,71 +724,118 @@ function UpgradeList({
   money: number
   onBuy: (u: UpgradeDef) => void
   onToggle: (id: string) => void
+  onContinue: () => void
 }) {
+  const [idx, setIdx] = useState(0)
+  const u = upgrades[idx]
+  const owned = ownedIds.includes(u.id)
+  const equipped = equippedIds.includes(u.id)
+  const canAfford = money >= u.price
+  const go = (delta: number) => setIdx(i => (i + delta + upgrades.length) % upgrades.length)
+  const effectLabel = effectsSummary(u.effects)
   return (
-    <div className="space-y-2">
-      <div className="text-[9px] tracking-[4px] font-mono text-white/40 uppercase">
-        Garage mods · {equippedIds.length} fitted
+    <div className="space-y-3">
+      <div className="text-[9px] tracking-[4px] font-mono text-white/45 uppercase text-center">
+        Bolt on mods ({equippedIds.length} fitted)
       </div>
-      {upgrades.map(u => {
-        const owned = ownedIds.includes(u.id)
-        const equipped = equippedIds.includes(u.id)
-        const canAfford = money >= u.price
-        return (
-          <div
-            key={u.id}
-            className="rounded-lg border border-white/10 bg-black/40 px-3 py-2 flex flex-col gap-1"
+      <div className="relative rounded-xl border border-white/10 bg-gradient-to-b from-amber-950/15 via-black/60 to-black/75 backdrop-blur-md overflow-hidden py-5 px-3">
+        <div
+          className="absolute inset-x-0 top-0 h-32 pointer-events-none"
+          style={{ background: 'radial-gradient(circle at 50% 0%, rgba(252,208,11,0.16), transparent 60%)' }}
+        />
+        <div className="flex justify-center gap-1 mb-3">
+          {upgrades.map((mod, i) => (
+            <span
+              key={mod.id}
+              className="w-1.5 h-1.5 rounded-full transition-all"
+              style={{
+                backgroundColor:
+                  i === idx ? '#fcd00b'
+                  : equippedIds.includes(mod.id) ? 'rgba(52,211,153,0.85)'
+                  : ownedIds.includes(mod.id) ? 'rgba(255,255,255,0.4)'
+                  : 'rgba(255,255,255,0.12)',
+                transform: i === idx ? 'scale(1.4)' : 'scale(1)',
+              }}
+            />
+          ))}
+        </div>
+        <div className="flex items-stretch gap-2">
+          <button
+            onClick={() => go(-1)}
+            aria-label="Previous mod"
+            className="shrink-0 w-9 self-stretch rounded-md border border-white/10 bg-black/40 hover:bg-black/60 transition flex items-center justify-center text-white/60 hover:text-amber-300 text-2xl"
           >
-            <div className="flex items-start gap-2">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-[8px] tracking-[2px] font-mono text-amber-300/80">{u.tag}</span>
-                  <span className="font-mono font-bold text-white text-sm truncate">{u.name}</span>
-                </div>
-                <div className="text-[10px] font-mono text-white/55 mt-0.5">{u.desc}</div>
-                <div className="text-[9px] font-mono text-white/35 mt-0.5">{effectsSummary(u.effects)}</div>
-              </div>
-              <div className="shrink-0">
-                {owned ? (
-                  <button
-                    onClick={() => onToggle(u.id)}
-                    className={`text-[9px] tracking-[2px] font-mono font-bold rounded px-2.5 py-1.5 border transition ${
-                      equipped
-                        ? 'text-emerald-300 border-emerald-400/40 bg-emerald-500/10'
-                        : 'text-white/70 border-white/20 bg-black/40 hover:bg-white/5'
-                    }`}
-                  >
-                    {equipped ? 'FITTED' : 'FIT'}
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => onBuy(u)}
-                    disabled={!canAfford}
-                    className={`text-[9px] tracking-[2px] font-mono font-bold rounded px-2.5 py-1.5 border transition ${
-                      canAfford
-                        ? 'text-black bg-amber-300 border-amber-400 hover:bg-amber-200 active:scale-[0.97]'
-                        : 'text-white/30 border-white/10 bg-black/40 cursor-not-allowed'
-                    }`}
-                  >
-                    R{u.price.toLocaleString()}
-                  </button>
-                )}
-              </div>
-            </div>
+            ‹
+          </button>
+          <div className="flex-1 flex flex-col items-center text-center px-1">
+            <div className="text-[9px] tracking-[4px] font-mono text-amber-300/80 uppercase">{u.tag}</div>
+            <div className="font-mono font-extrabold text-white text-lg leading-tight mt-1">{u.name}</div>
+            <div className="text-[11px] font-mono text-white/65 mt-2 leading-snug max-w-[230px]">{u.desc}</div>
+            <div className="text-[10px] font-mono text-white/40 mt-2 leading-snug max-w-[230px]">{effectLabel}</div>
+            {equipped && (
+              <div className="mt-2 text-[9px] tracking-[3px] font-mono text-emerald-300">FITTED</div>
+            )}
           </div>
-        )
-      })}
+          <button
+            onClick={() => go(1)}
+            aria-label="Next mod"
+            className="shrink-0 w-9 self-stretch rounded-md border border-white/10 bg-black/40 hover:bg-black/60 transition flex items-center justify-center text-white/60 hover:text-amber-300 text-2xl"
+          >
+            ›
+          </button>
+        </div>
+      </div>
+      {owned ? (
+        <button
+          onClick={() => onToggle(u.id)}
+          className={`w-full rounded-lg font-mono text-[13px] tracking-[4px] font-extrabold transition py-3 ${
+            equipped
+              ? 'text-emerald-200 bg-emerald-500/20 border border-emerald-400/40'
+              : 'text-black bg-amber-300 hover:bg-amber-200 active:scale-[0.99] shadow-[0_0_20px_rgba(252,208,11,0.3)]'
+          }`}
+        >
+          {equipped ? 'UNFIT' : 'FIT IT'}
+        </button>
+      ) : canAfford ? (
+        <button
+          onClick={() => onBuy(u)}
+          className="w-full rounded-lg font-mono text-[13px] tracking-[4px] font-extrabold text-black bg-emerald-300 hover:bg-emerald-200 active:scale-[0.99] transition py-3 shadow-[0_0_20px_rgba(34,197,94,0.3)]"
+        >
+          BUY R{u.price.toLocaleString()}
+        </button>
+      ) : (
+        <button disabled className="w-full rounded-lg font-mono text-[13px] tracking-[4px] font-bold text-white/40 bg-white/5 py-3 cursor-not-allowed">
+          R{u.price.toLocaleString()} — NEED MORE RANDS
+        </button>
+      )}
+      <button
+        onClick={onContinue}
+        className="w-full rounded-lg font-mono text-[11px] tracking-[4px] font-bold text-white/70 border border-white/15 bg-black/30 hover:bg-white/5 transition py-2.5"
+      >
+        DONE WITH MODS ▸
+      </button>
     </div>
   )
 }
 
 export default function SpinnaGarage({ save, onSave, onPlay, player, onLogin, onLogout }: SpinnaGarageProps) {
-  const [step, setStep] = useState<Step>('car')
+  const router = useRouter()
+  // If save already has a mode, skip the picker on subsequent visits.
+  const [step, setStep] = useState<Step>(save.mode ? 'car' : 'mode')
 
   const car = CARS.find(c => c.id === save.car)!
   const tire = TIRES.find(t => t.id === save.tires)!
   const ownedCars = CARS.filter(c => save.ownedCars.includes(c.id))
   const unownedCars = CARS.filter(c => !save.ownedCars.includes(c.id))
+
+  const pickMode = useCallback((mode: GameMode) => {
+    if (mode.id === 'multiplayer') {
+      router.push('/online')
+      return
+    }
+    onSave({ ...save, mode: mode.id })
+    setStep('car')
+  }, [save, onSave, router])
 
   const selectCar = useCallback((carId: string) => {
     if (save.ownedCars.includes(carId)) {
@@ -761,32 +893,41 @@ export default function SpinnaGarage({ save, onSave, onPlay, player, onLogin, on
     <main className="min-h-dvh bg-background text-white">
       <div className="max-w-lg mx-auto px-4 py-4 sm:py-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3">
           <div>
             <div className="text-[8px] tracking-[5px] font-mono text-white/40 uppercase">Spinna</div>
             <h1 className="font-mono font-black text-2xl text-amber-300 tracking-wide">GARAGE</h1>
           </div>
-          <div className="flex items-center gap-2">
-            {player ? (
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono text-white/60">{player.username}</span>
-                <button
-                  onClick={onLogout}
-                  className="text-[9px] font-mono text-white/30 hover:text-white/60 transition px-2 py-1 border border-white/10 rounded"
-                >
-                  OUT
-                </button>
-              </div>
-            ) : (
+          {player && (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono text-white/60 truncate max-w-[140px]">{player.username}</span>
               <button
-                onClick={onLogin}
-                className="text-[10px] font-mono text-amber-300 hover:text-amber-200 transition px-2 py-1 border border-amber-400/30 rounded"
+                onClick={onLogout}
+                className="text-[9px] font-mono text-white/30 hover:text-white/60 transition px-2 py-1 border border-white/10 rounded"
               >
-                LOGIN
+                OUT
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
+
+        {/* Sign-in prompt — front and centre when no player. */}
+        {!player && (
+          <button
+            onClick={onLogin}
+            className="w-full mb-4 rounded-lg border border-amber-400/40 bg-gradient-to-r from-amber-500/15 via-amber-400/10 to-amber-500/15 px-4 py-3 text-left flex items-center justify-between gap-2 hover:from-amber-500/20 hover:to-amber-500/20 transition active:scale-[0.99]"
+          >
+            <div className="min-w-0">
+              <div className="text-[9px] tracking-[3px] font-mono text-amber-300/90 uppercase">Sign in</div>
+              <div className="text-[12px] font-mono text-white/80 leading-tight">
+                Save your money, climb the leaderboard, host rooms.
+              </div>
+            </div>
+            <div className="shrink-0 text-[10px] tracking-[3px] font-mono font-extrabold text-amber-300">
+              SIGN IN ▸
+            </div>
+          </button>
+        )}
 
         {/* Wallet / best */}
         <div className="grid grid-cols-2 gap-3 mb-5">
@@ -806,17 +947,34 @@ export default function SpinnaGarage({ save, onSave, onPlay, player, onLogin, on
 
         <StepHeader step={step} />
 
+        {/* ── Step 0: Pick a mode ──────────────────────────────────────────── */}
+        {step === 'mode' && (
+          <ModePicker
+            modes={GAME_MODES}
+            currentId={save.mode}
+            onPick={pickMode}
+          />
+        )}
+
         {/* ── Step 1: Pick your ride — single-car spotlight carousel ──────── */}
         {step === 'car' && (
-          <CarCarousel
-            cars={CARS}
-            currentId={save.car}
-            ownedIds={save.ownedCars}
-            money={save.money}
-            onSelect={selectCar}
-            onBuy={buyCar}
-            onContinue={() => setStep('tires')}
-          />
+          <div className="space-y-3">
+            <button
+              onClick={() => setStep('mode')}
+              className="text-[10px] font-mono text-white/40 hover:text-white/70 transition"
+            >
+              ← Change mode
+            </button>
+            <CarCarousel
+              cars={CARS}
+              currentId={save.car}
+              ownedIds={save.ownedCars}
+              money={save.money}
+              onSelect={selectCar}
+              onBuy={buyCar}
+              onContinue={() => setStep('tires')}
+            />
+          </div>
         )}
 
         {/* ── Step 2: Pick your tyres — single-tire spotlight carousel ────── */}
@@ -846,20 +1004,15 @@ export default function SpinnaGarage({ save, onSave, onPlay, player, onLogin, on
             >
               ← Back to tyres
             </button>
-            <UpgradeList
+            <UpgradeCarousel
               upgrades={UPGRADES}
               ownedIds={save.ownedUpgrades ?? []}
               equippedIds={save.equippedUpgrades ?? []}
               money={save.money}
               onBuy={buyUpgrade}
               onToggle={toggleEquip}
+              onContinue={() => setStep('track')}
             />
-            <button
-              onClick={() => setStep('track')}
-              className="w-full rounded font-mono text-[12px] tracking-[5px] font-bold text-black bg-amber-300 hover:bg-amber-200 active:scale-[0.99] transition py-3"
-            >
-              CONTINUE TO TRACK ▸
-            </button>
           </div>
         )}
 
@@ -909,38 +1062,25 @@ export default function SpinnaGarage({ save, onSave, onPlay, player, onLogin, on
               </div>
             </div>
 
-            {/* Mode toggle */}
-            <div>
-              <div className="text-[9px] tracking-[4px] font-mono text-white/40 uppercase mb-2">
-                Mode
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {GAME_MODES.map(m => {
-                  const active = (save.mode ?? 'free') === m.id
-                  return (
-                    <button
-                      key={m.id}
-                      onClick={() => onSave({ ...save, mode: m.id })}
-                      className="rounded-lg border p-3 text-left transition-all"
-                      style={{
-                        borderColor: active ? m.accent : 'rgba(255,255,255,0.12)',
-                        background: active ? `${m.accent}1a` : 'rgba(0,0,0,0.30)',
-                      }}
-                    >
-                      <div className="text-[9px] tracking-[3px] font-mono" style={{ color: m.accent }}>
-                        {m.name}
-                      </div>
-                      <div className="mt-1 text-[10px] font-mono text-white/70 leading-tight">
-                        {m.subtitle}
-                      </div>
-                      <div className="mt-1 text-[9px] font-mono text-white/40 leading-snug">
-                        {m.description}
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
+            {/* Active mode display (chosen at step 1) */}
+            {(() => {
+              const m = GAME_MODES.find(x => x.id === save.mode) ?? GAME_MODES[1]
+              return (
+                <button
+                  onClick={() => setStep('mode')}
+                  className="w-full rounded-lg border p-3 flex items-center justify-between gap-2 transition active:scale-[0.99]"
+                  style={{ borderColor: `${m.accent}55`, background: `${m.accent}14` }}
+                >
+                  <div className="text-left">
+                    <div className="text-[9px] tracking-[3px] font-mono uppercase" style={{ color: m.accent }}>
+                      Mode · {m.name}
+                    </div>
+                    <div className="text-[10px] font-mono text-white/65 leading-tight">{m.subtitle}</div>
+                  </div>
+                  <div className="text-[9px] tracking-[2px] font-mono text-white/45">CHANGE ›</div>
+                </button>
+              )
+            })()}
 
             <button
               onClick={onPlay}
@@ -956,17 +1096,6 @@ export default function SpinnaGarage({ save, onSave, onPlay, player, onLogin, on
           </div>
         )}
 
-        {/* Guest sign-in nudge (every step) */}
-        {!player && (
-          <div className="mt-6 text-center">
-            <a
-              href="/auth/login"
-              className="text-[10px] font-mono text-white/35 hover:text-amber-300 transition"
-            >
-              Sign in to save scores →
-            </a>
-          </div>
-        )}
       </div>
     </main>
   )
