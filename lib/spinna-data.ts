@@ -19,7 +19,7 @@ export const CARS = [
 // more dramatically: a fresh set of sport rubber lasts roughly 3× a budget set
 // AND grips meaningfully better, while slicks are stickier but disposable.
 export const TIRES = [
-  {id:"used",name:"USED CHINESES",desc:"Last legs. Sloppy in every direction.",gripLong:0.45,gripLat:0.40,durability:150,wearMul:1.6,price:120,gripStat:0.2,lifeStat:0.15},
+  {id:"used",name:"USED CHINESES",desc:"Tired rubber — soft and sloppy, but still drivable.",gripLong:0.62,gripLat:0.58,durability:160,wearMul:1.55,price:120,gripStat:0.3,lifeStat:0.2},
   {id:"budget",name:"BUDGET ALL-SEASON",desc:"Honest rubber. Wears in a few hot laps.",gripLong:0.78,gripLat:0.74,durability:260,wearMul:1,price:480,gripStat:0.5,lifeStat:0.5},
   {id:"sport",name:"PERFORMANCE SPORT",desc:"Sticky on tar — lasts about 3× a budget set.",gripLong:1.05,gripLat:1.05,durability:780,wearMul:0.85,price:1200,gripStat:0.85,lifeStat:0.95},
   {id:"slick",name:"BURNER SEMI-SLICKS",desc:"Heavenly grip, gone fast.",gripLong:1.2,gripLat:1.2,durability:220,wearMul:1.9,price:900,gripStat:1,lifeStat:0.25},
@@ -107,6 +107,106 @@ export interface SaveData {
   totalLifetimeRands: number
   track: string
   mode: string
+  /** Upgrade ids the player has purchased. */
+  ownedUpgrades?: string[]
+  /** Upgrade ids currently bolted on the active car. */
+  equippedUpgrades?: string[]
+}
+
+// ─── Upgrades ───────────────────────────────────────────────────────────────
+// Replace the old "engine settings" tune panel: instead of dragging sliders,
+// the player buys upgrades + bolts them on. Each upgrade applies one or more
+// multipliers to the live tune. Multiple stacks; effects multiply.
+export interface UpgradeDef {
+  id: string
+  name: string
+  tag: string
+  desc: string
+  price: number
+  /** Multipliers applied on top of DEFAULT_TUNE. Each is 1.0 = no effect. */
+  effects: Partial<Record<keyof TuneData, number>>
+}
+
+export const UPGRADES: UpgradeDef[] = [
+  {
+    id: 'turbo',
+    name: 'TURBO',
+    tag: 'POWER',
+    desc: '+25% engine, +5% top speed. Less low-speed bite, easier to spin.',
+    price: 4500,
+    effects: { enginePower: 1.25, topSpeed: 1.05, lowSpeedStick: 0.92 },
+  },
+  {
+    id: 'cold_intake',
+    name: 'COLD AIR INTAKE',
+    tag: 'BREATH',
+    desc: 'Modest +8% engine, cleaner pickup off-throttle.',
+    price: 1500,
+    effects: { enginePower: 1.08, spinThrottle: 0.95 },
+  },
+  {
+    id: 'lwfly',
+    name: 'LIGHTWEIGHT FLYWHEEL',
+    tag: 'SNAP',
+    desc: 'Engine snaps quicker into wheelspin. -8% low-speed stick.',
+    price: 2200,
+    effects: { spinThrottle: 0.85, lowSpeedStick: 0.92 },
+  },
+  {
+    id: 'coilovers',
+    name: 'COILOVERS',
+    tag: 'STEER',
+    desc: '+15% max steer, +5% lat grip, -3% top speed.',
+    price: 3000,
+    effects: { steerMaxRad: 1.15, gripLat: 1.05, topSpeed: 0.97 },
+  },
+  {
+    id: 'lsd',
+    name: 'WELDED DIFF (LSD)',
+    tag: 'DRIFT',
+    desc: '+20% rear bias, +8% lat grip — rear locks up, deeper drifts.',
+    price: 3500,
+    effects: { rearBias: 1.2, gripLat: 1.08 },
+  },
+  {
+    id: 'spoiler',
+    name: 'REAR SPOILER',
+    tag: 'STICK',
+    desc: '+10% lat grip, -2% top speed. Plants the rear at speed.',
+    price: 2000,
+    effects: { gripLat: 1.10, topSpeed: 0.98 },
+  },
+  {
+    id: 'softer_rubber',
+    name: 'SOFT-COMPOUND TYRE PREP',
+    tag: 'LIFE',
+    desc: '-25% wear rate — every tyre lasts longer. Costs you 4% engine.',
+    price: 2800,
+    effects: { wearRate: 0.75, enginePower: 0.96 },
+  },
+  {
+    id: 'big_brakes',
+    name: 'BIG BRAKE KIT',
+    tag: 'STOP',
+    desc: '+25% low-speed stick — settles the car when you lift.',
+    price: 1800,
+    effects: { lowSpeedStick: 1.25, topSpeed: 0.98 },
+  },
+]
+
+/** Compose DEFAULT_TUNE with all currently-equipped upgrade effects. */
+export function applyUpgrades(base: TuneData, equipped: string[]): TuneData {
+  const out: TuneData = { ...base }
+  for (const id of equipped) {
+    const up = UPGRADES.find(u => u.id === id)
+    if (!up) continue
+    for (const k of Object.keys(up.effects) as Array<keyof TuneData>) {
+      const mul = up.effects[k]
+      if (mul == null) continue
+      out[k] = out[k] * mul
+    }
+  }
+  return out
 }
 
 export interface TuneData {

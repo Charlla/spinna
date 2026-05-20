@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { CARS, TIRES, TRACKS, GAME_MODES, SaveData, Car, Tire, Track } from '@/lib/spinna-data'
+import { CARS, TIRES, TRACKS, GAME_MODES, UPGRADES, SaveData, Car, Tire, Track, UpgradeDef } from '@/lib/spinna-data'
 
 interface SpinnaGarageProps {
   save: SaveData
@@ -12,9 +12,9 @@ interface SpinnaGarageProps {
   onLogout: () => void
 }
 
-type Step = 'car' | 'tires' | 'track' | 'spin'
-const STEPS: Step[] = ['car', 'tires', 'track', 'spin']
-const STEP_LABEL: Record<Step, string> = { car: 'Ride', tires: 'Tyres', track: 'Track', spin: 'Go' }
+type Step = 'car' | 'tires' | 'upgrades' | 'track' | 'spin'
+const STEPS: Step[] = ['car', 'tires', 'upgrades', 'track', 'spin']
+const STEP_LABEL: Record<Step, string> = { car: 'Ride', tires: 'Tyres', upgrades: 'Mods', track: 'Track', spin: 'Go' }
 
 function StatBar({ value, color = '#fcd00b' }: { value: number; color?: string }) {
   return (
@@ -614,6 +614,89 @@ function TirePreview() {
   )
 }
 
+// ─── Upgrade list ───────────────────────────────────────────────────────────
+// Each row: tag chip + name + price/owned indicator + effects summary.
+// Owned upgrades show an EQUIP/UNEQUIP toggle. Unowned show a BUY button.
+function effectsSummary(effects: UpgradeDef['effects']): string {
+  const parts: string[] = []
+  for (const k of Object.keys(effects) as Array<keyof UpgradeDef['effects']>) {
+    const v = effects[k]
+    if (v == null) continue
+    const pct = Math.round((v - 1) * 100)
+    if (pct === 0) continue
+    const sign = pct > 0 ? '+' : ''
+    parts.push(`${sign}${pct}% ${k}`)
+  }
+  return parts.join(' · ')
+}
+
+function UpgradeList({
+  upgrades, ownedIds, equippedIds, money, onBuy, onToggle,
+}: {
+  upgrades: UpgradeDef[]
+  ownedIds: string[]
+  equippedIds: string[]
+  money: number
+  onBuy: (u: UpgradeDef) => void
+  onToggle: (id: string) => void
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="text-[9px] tracking-[4px] font-mono text-white/40 uppercase">
+        Garage mods · {equippedIds.length} fitted
+      </div>
+      {upgrades.map(u => {
+        const owned = ownedIds.includes(u.id)
+        const equipped = equippedIds.includes(u.id)
+        const canAfford = money >= u.price
+        return (
+          <div
+            key={u.id}
+            className="rounded-lg border border-white/10 bg-black/40 px-3 py-2 flex flex-col gap-1"
+          >
+            <div className="flex items-start gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-[8px] tracking-[2px] font-mono text-amber-300/80">{u.tag}</span>
+                  <span className="font-mono font-bold text-white text-sm truncate">{u.name}</span>
+                </div>
+                <div className="text-[10px] font-mono text-white/55 mt-0.5">{u.desc}</div>
+                <div className="text-[9px] font-mono text-white/35 mt-0.5">{effectsSummary(u.effects)}</div>
+              </div>
+              <div className="shrink-0">
+                {owned ? (
+                  <button
+                    onClick={() => onToggle(u.id)}
+                    className={`text-[9px] tracking-[2px] font-mono font-bold rounded px-2.5 py-1.5 border transition ${
+                      equipped
+                        ? 'text-emerald-300 border-emerald-400/40 bg-emerald-500/10'
+                        : 'text-white/70 border-white/20 bg-black/40 hover:bg-white/5'
+                    }`}
+                  >
+                    {equipped ? 'FITTED' : 'FIT'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => onBuy(u)}
+                    disabled={!canAfford}
+                    className={`text-[9px] tracking-[2px] font-mono font-bold rounded px-2.5 py-1.5 border transition ${
+                      canAfford
+                        ? 'text-black bg-amber-300 border-amber-400 hover:bg-amber-200 active:scale-[0.97]'
+                        : 'text-white/30 border-white/10 bg-black/40 cursor-not-allowed'
+                    }`}
+                  >
+                    R{u.price.toLocaleString()}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function SpinnaGarage({ save, onSave, onPlay, player, onLogin, onLogout }: SpinnaGarageProps) {
   const [step, setStep] = useState<Step>('car')
 
@@ -645,7 +728,28 @@ export default function SpinnaGarage({ save, onSave, onPlay, player, onLogin, on
     // First selection of a tire is free in this build (no separate purchase flow). Just mount it.
     onSave({ ...save, tires: tireId, tireHealth: 100 })
     void t
-    setStep('track')
+    setStep('upgrades')
+  }, [save, onSave])
+
+  const buyUpgrade = useCallback((upgrade: UpgradeDef) => {
+    if (save.money < upgrade.price) return
+    if ((save.ownedUpgrades ?? []).includes(upgrade.id)) return
+    onSave({
+      ...save,
+      money: save.money - upgrade.price,
+      ownedUpgrades: [...(save.ownedUpgrades ?? []), upgrade.id],
+      equippedUpgrades: [...(save.equippedUpgrades ?? []), upgrade.id],
+    })
+  }, [save, onSave])
+
+  const toggleEquip = useCallback((upgradeId: string) => {
+    const owned = save.ownedUpgrades ?? []
+    if (!owned.includes(upgradeId)) return
+    const equipped = save.equippedUpgrades ?? []
+    const next = equipped.includes(upgradeId)
+      ? equipped.filter(id => id !== upgradeId)
+      : [...equipped, upgradeId]
+    onSave({ ...save, equippedUpgrades: next })
   }, [save, onSave])
 
   const selectTrack = useCallback((trackId: string) => {
@@ -733,14 +837,40 @@ export default function SpinnaGarage({ save, onSave, onPlay, player, onLogin, on
           </div>
         )}
 
-        {/* ── Step 3: Pick your track ─────────────────────────────────────── */}
-        {step === 'track' && (
+        {/* ── Step 3: Bolt on upgrades ────────────────────────────────────── */}
+        {step === 'upgrades' && (
           <div className="space-y-3">
             <button
               onClick={() => setStep('tires')}
               className="text-[10px] font-mono text-white/40 hover:text-white/70 transition"
             >
               ← Back to tyres
+            </button>
+            <UpgradeList
+              upgrades={UPGRADES}
+              ownedIds={save.ownedUpgrades ?? []}
+              equippedIds={save.equippedUpgrades ?? []}
+              money={save.money}
+              onBuy={buyUpgrade}
+              onToggle={toggleEquip}
+            />
+            <button
+              onClick={() => setStep('track')}
+              className="w-full rounded font-mono text-[12px] tracking-[5px] font-bold text-black bg-amber-300 hover:bg-amber-200 active:scale-[0.99] transition py-3"
+            >
+              CONTINUE TO TRACK ▸
+            </button>
+          </div>
+        )}
+
+        {/* ── Step 4: Pick your track ─────────────────────────────────────── */}
+        {step === 'track' && (
+          <div className="space-y-3">
+            <button
+              onClick={() => setStep('upgrades')}
+              className="text-[10px] font-mono text-white/40 hover:text-white/70 transition"
+            >
+              ← Back to mods
             </button>
             <TrackCarousel
               tracks={TRACKS}

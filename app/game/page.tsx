@@ -6,12 +6,11 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import SpinnaHud from '@/components/spinna-hud'
 import SpinnaControls from '@/components/spinna-controls'
-import SpinnaTunePanel from '@/components/spinna-tune-panel'
 import PauseOverlay from '@/components/games/PauseOverlay'
 import NeonButton from '@/components/games/NeonButton'
 import { SpinnaCanvasHandle } from '@/components/spinna-canvas'
 import { setAudioEnabled } from '@/lib/spinna-engine'
-import { SAVE_KEY, TUNE_KEY, DEFAULT_SAVE, DEFAULT_TUNE, SaveData, TuneData, GameStats } from '@/lib/spinna-data'
+import { SAVE_KEY, DEFAULT_SAVE, DEFAULT_TUNE, SaveData, TuneData, GameStats, applyUpgrades } from '@/lib/spinna-data'
 
 // Load canvas client-side only (uses browser APIs)
 const SpinnaCanvas = dynamic(() => import('@/components/spinna-canvas'), { ssr: false })
@@ -29,9 +28,10 @@ export default function GamePage() {
   const router = useRouter()
   const canvasRef = useRef<SpinnaCanvasHandle>(null)
   const inputsRef = useRef<{ throttle: number; steer: number; hbrk: boolean }>({ throttle: 0, steer: 0, hbrk: false })
+  // Tune is no longer player-edited — it's derived from DEFAULT_TUNE +
+  // whatever upgrades are currently equipped. Recomputed whenever the save
+  // changes (see effect below).
   const tuneRef = useRef<TuneData>({ ...DEFAULT_TUNE })
-  const [tune, setTune] = useState<TuneData>({ ...DEFAULT_TUNE })
-  const [tuneOpen, setTuneOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [save, setSave] = useState<SaveData>({ ...DEFAULT_SAVE })
   const [view, setView] = useState<'play' | 'results'>('play')
@@ -62,16 +62,6 @@ export default function GamePage() {
       }
     } catch { /* ignore */ }
 
-    try {
-      const tRaw = localStorage.getItem(TUNE_KEY)
-      if (tRaw) {
-        const parsed = JSON.parse(tRaw)
-        const merged: TuneData = { ...DEFAULT_TUNE, ...parsed }
-        setTune(merged)
-        tuneRef.current = merged
-      }
-    } catch { /* ignore */ }
-
     fetch('/api/auth/me')
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data?.player) setPlayer(data.player) })
@@ -79,6 +69,12 @@ export default function GamePage() {
 
     setLoaded(true)
   }, [])
+
+  // Rebuild the active tune whenever the equipped upgrade set changes.
+  useEffect(() => {
+    const equipped = save.equippedUpgrades ?? []
+    tuneRef.current = applyUpgrades(DEFAULT_TUNE, equipped)
+  }, [save.equippedUpgrades])
 
   // Start game once the save has been hydrated AND the canvas is ready.
   // Previously the start poll fired on the first render with DEFAULT_SAVE before
@@ -166,16 +162,6 @@ export default function GamePage() {
     setBanner(prev => ({ key: prev.key + 1, text, sub, color }))
   }, [])
 
-  const handleTuneChange = useCallback((next: TuneData) => {
-    setTune(next)
-    tuneRef.current = next
-  }, [])
-
-  // Original v0 behavior: tune panel is a live side-sheet — physics keeps running
-  // so the player can feel each knob change immediately.
-  const openTune = useCallback(() => setTuneOpen(true), [])
-  const closeTune = useCallback(() => setTuneOpen(false), [])
-
   const handleSubmitScore = useCallback(async () => {
     if (!result || !player || submitting || submitted) return
     setSubmitting(true)
@@ -219,12 +205,6 @@ export default function GamePage() {
             onMenu={() => setMenuOpen(true)}
           />
           <SpinnaControls inputsRef={inputsRef} resetKey={resetKey} />
-          <SpinnaTunePanel
-            open={tuneOpen}
-            tune={tune}
-            onChange={handleTuneChange}
-            onClose={closeTune}
-          />
           <PauseOverlay
             open={menuOpen}
             title="PAUSED"
@@ -249,7 +229,6 @@ export default function GamePage() {
                 </NeonButton>
               </>
             }
-            onSettings={() => { setMenuOpen(false); openTune() }}
             onQuit={() => { setMenuOpen(false); handleExit() }}
           />
         </>
