@@ -54,8 +54,8 @@ export const GAME_MODES: GameMode[] = [
   {
     id: 'multiplayer',
     name: 'MULTIPLAYER',
-    subtitle: 'Spin against your buddies online',
-    description: 'Online rooms. First to circle a ring banks it. Needs a Spit Wars account to host.',
+    subtitle: 'Online event, up to 6 mates',
+    description: 'Host names the event, picks 1–15 minutes, opens it up or shares a code. Highest score on the leaderboard when the timer runs out wins.',
     accent: '#ef4444',
   },
   {

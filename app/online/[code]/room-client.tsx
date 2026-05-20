@@ -21,6 +21,9 @@ interface Room {
   world_seed: number
   current_ring: ServerRing | null
   ring_idx: number
+  name: string | null
+  duration_minutes: number
+  is_public: boolean
   started_at: string | null
   ended_at: string | null
 }
@@ -283,11 +286,21 @@ export default function RoomClient({
         <div className="max-w-lg mx-auto px-4 py-4 sm:py-6 space-y-4">
           <div className="flex items-center justify-between">
             <button onClick={() => router.push('/online')} className="text-[9px] tracking-[4px] font-mono text-white/40 hover:text-white/70 transition">
-              ← Lobbies
+              ← Events
             </button>
             <div className="text-right">
-              <div className="text-[8px] tracking-[4px] font-mono text-white/40 uppercase">Room</div>
+              <div className="text-[8px] tracking-[4px] font-mono text-white/40 uppercase">Event code</div>
               <div className="font-mono font-extrabold text-amber-300 text-2xl tracking-[8px]">{room.code}</div>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-red-500/30 bg-gradient-to-r from-red-950/20 via-black/60 to-black/70 px-3 py-3">
+            <div className="text-[9px] tracking-[3px] font-mono text-red-300 uppercase">Event</div>
+            <div className="font-mono font-extrabold text-white text-lg leading-tight truncate mt-0.5">
+              {room.name?.trim() || `${room.host_name}'s spin`}
+            </div>
+            <div className="text-[10px] font-mono text-white/55 mt-0.5">
+              Host {room.host_name} · {room.duration_minutes} minute{room.duration_minutes === 1 ? '' : 's'} · {room.is_public ? 'open' : 'code-only'}
             </div>
           </div>
 
@@ -305,7 +318,7 @@ export default function RoomClient({
           <div>
             <div className="text-[9px] tracking-[4px] font-mono text-white/45 uppercase mb-2">Seats</div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {Array.from({ length: 8 }).map((_, seat) => {
+              {Array.from({ length: 6 }).map((_, seat) => {
                 const m = members.find(x => x.seat === seat)
                 return (
                   <div
@@ -333,13 +346,13 @@ export default function RoomClient({
 
           {!me && (
             <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] font-mono text-amber-100">
-              <a href={`/auth/login?next=/online/${room.code}`} className="underline">Sign in</a> to join this room.
+              <a href={`/auth/login?next=/online/${room.code}`} className="underline">Sign in</a> to join this event.
             </div>
           )}
 
           {me && !meMember && !verifyOpen && (
             <NeonButton variant="primary" size="lg" fullWidth onClick={() => setVerifyOpen(true)}>
-              {joining ? 'Joining…' : 'Join room'}
+              {joining ? 'Joining…' : 'Join event'}
             </NeonButton>
           )}
 
@@ -369,7 +382,7 @@ export default function RoomClient({
 
           {me && meMember && (
             <button onClick={leave} className="w-full text-[10px] tracking-[3px] font-mono text-white/40 hover:text-red-300 transition">
-              Leave room
+              Leave event
             </button>
           )}
         </div>
@@ -396,7 +409,7 @@ export default function RoomClient({
             </div>
           ))}
           <NeonButton variant="ghost" size="md" fullWidth onClick={() => router.push('/online')}>
-            Back to lobbies
+            Back to events
           </NeonButton>
         </div>
       </main>
@@ -416,17 +429,22 @@ export default function RoomClient({
         multiplayer={{ ringRef, opponentsRef, onRingComplete }}
       />
       <SpinnaControls inputsRef={inputsRef} resetKey={resetKey} />
-      <div className="pointer-events-none absolute top-[max(env(safe-area-inset-top),12px)] left-3 right-3 flex items-start gap-2 z-10">
-        <div className="rounded-[3px] border border-white/10 bg-[#0c0c10]/60 backdrop-blur-md px-[10px] py-[6px] flex-1 min-w-0">
-          <div className="text-[8px] tracking-[2px] text-white/55 font-mono">ROOM</div>
-          <div className="text-[16px] leading-none font-extrabold text-amber-300 font-mono tracking-[4px]">{room.code}</div>
-        </div>
-        <div className="rounded-[3px] border border-white/10 bg-[#0c0c10]/60 backdrop-blur-md px-[10px] py-[6px] flex-1 min-w-0">
-          <div className="text-[8px] tracking-[2px] text-white/55 font-mono">RINGS</div>
-          <div className="text-[16px] leading-none font-extrabold text-emerald-400 font-mono tabular-nums">
-            {meMember?.rings_banked ?? 0}
+      <div className="pointer-events-none absolute top-[max(env(safe-area-inset-top),12px)] left-3 right-3 z-10 space-y-2">
+        <div className="flex items-start gap-2">
+          <div className="rounded-[3px] border border-white/10 bg-[#0c0c10]/60 backdrop-blur-md px-[10px] py-[6px] flex-1 min-w-0">
+            <div className="text-[8px] tracking-[2px] text-white/55 font-mono">EVENT</div>
+            <div className="text-[14px] leading-none font-extrabold text-amber-300 font-mono tracking-[4px] truncate">
+              {room.name?.trim() || room.code}
+            </div>
+          </div>
+          <div className="rounded-[3px] border border-white/10 bg-[#0c0c10]/60 backdrop-blur-md px-[10px] py-[6px] flex-1 min-w-0">
+            <div className="text-[8px] tracking-[2px] text-white/55 font-mono">RINGS</div>
+            <div className="text-[16px] leading-none font-extrabold text-emerald-400 font-mono tabular-nums">
+              {meMember?.rings_banked ?? 0}
+            </div>
           </div>
         </div>
+        <EventTimer room={room} />
       </div>
       {/* Leaderboard ticker — left side */}
       <div className="pointer-events-none absolute left-3 top-[calc(max(env(safe-area-inset-top),12px)+58px)] z-10 space-y-1">
@@ -455,5 +473,41 @@ export default function RoomClient({
         <div className="text-xs tracking-[5px] mt-1 text-white/75">{bannerRef.current.sub}</div>
       </div>
     </main>
+  )
+}
+
+// ─── Session timer — shows mm:ss remaining and posts /timeout when it expires.
+function EventTimer({ room }: { room: Room }) {
+  const [now, setNow] = useState(() => Date.now())
+  const firedRef = useRef(false)
+  const deadline = useMemo(() => {
+    if (!room.started_at) return null
+    return Date.parse(room.started_at) + room.duration_minutes * 60_000
+  }, [room.started_at, room.duration_minutes])
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 500)
+    return () => window.clearInterval(id)
+  }, [])
+  if (!deadline) return null
+  const remaining = Math.max(0, deadline - now)
+  const total = room.duration_minutes * 60_000
+  const pct = (remaining / total) * 100
+  const secs = Math.ceil(remaining / 1000)
+  const mm = Math.floor(secs / 60)
+  const ss = secs % 60
+  const color = remaining < 30_000 ? '#ef4444' : remaining < 90_000 ? '#fcd00b' : '#22c55e'
+  // Fire timeout once.
+  if (remaining <= 0 && !firedRef.current) {
+    firedRef.current = true
+    fetch(`/api/rooms/${room.code}/timeout`, { method: 'POST' }).catch(() => {})
+  }
+  return (
+    <div className="relative h-3 rounded-[2px] overflow-hidden border border-white/10 bg-black/55 backdrop-blur-md pointer-events-none">
+      <div className="absolute left-0 top-0 bottom-0 transition-all" style={{ width: `${pct}%`, background: color }} />
+      <div className="absolute inset-0 flex items-center justify-between px-2 text-[9px] tracking-[2px] font-mono">
+        <span className="text-white/85">EVENT</span>
+        <span className="text-white/85 tabular-nums">{mm}:{ss.toString().padStart(2, '0')}</span>
+      </div>
+    </div>
   )
 }

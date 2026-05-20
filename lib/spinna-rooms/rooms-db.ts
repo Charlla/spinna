@@ -20,11 +20,21 @@ export interface Room {
   current_ring: RoomRing | null
   ring_idx: number
   arena_size: number
+  /** Event name set by the host on create. */
+  name: string | null
+  /** Total session length once started — 1, 3, 5, 10, or 15 minutes. */
+  duration_minutes: number
+  /** Public events appear on the lobby list; private events are URL-only. */
+  is_public: boolean
   started_at: string | null
   ended_at: string | null
   created_at: string
   updated_at: string
 }
+
+export const VALID_DURATIONS = [1, 3, 5, 10, 15] as const
+export type EventDuration = typeof VALID_DURATIONS[number]
+export const MAX_MEMBERS = 6
 
 export interface RoomMember {
   id: string
@@ -51,13 +61,14 @@ export async function findRoomByCode(code: string): Promise<Room | null> {
   return data as Room | null
 }
 
-/** List up to N open rooms (status='waiting'), newest first. */
+/** List up to N open public events (status='waiting'), newest first. */
 export async function listOpenRooms(limit = 20) {
   const db = createServiceClient()
   const { data } = await db
     .from('spinna_rooms')
-    .select('id, code, host_name, status, created_at')
+    .select('id, code, name, host_name, status, duration_minutes, created_at')
     .eq('status', 'waiting')
+    .eq('is_public', true)
     .order('created_at', { ascending: false })
     .limit(limit)
   return data ?? []
@@ -74,13 +85,17 @@ export async function listRoomMembers(roomId: string): Promise<RoomMember[]> {
   return (data ?? []) as RoomMember[]
 }
 
-/** Insert a room owned by `host`. Retries on code collisions. */
-export async function createRoom(host: {
-  id: string
-  display_name: string
-}): Promise<Room> {
+/** Insert an event owned by `host`. Retries on code collisions. */
+export async function createRoom(
+  host: { id: string; display_name: string },
+  opts: { name: string; duration_minutes: number; is_public: boolean }
+): Promise<Room> {
   const db = createServiceClient()
   const worldSeed = makeWorldSeed()
+  const duration = (VALID_DURATIONS as readonly number[]).includes(opts.duration_minutes)
+    ? opts.duration_minutes
+    : 5
+  const name = (opts.name ?? '').trim().slice(0, 60) || `${host.display_name}'s spin`
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = makeRoomCode()
     const { data, error } = await db
@@ -92,6 +107,9 @@ export async function createRoom(host: {
         status: 'waiting',
         world_seed: worldSeed,
         ring_idx: 0,
+        name,
+        duration_minutes: duration,
+        is_public: opts.is_public,
       })
       .select('*')
       .single()
@@ -124,10 +142,10 @@ export async function joinRoom(
   const members = await listRoomMembers(room.id)
   const existing = members.find(m => m.player_id === player.id)
   if (existing) return existing
-  if (members.length >= 8) throw new Error('Room is full (8 players)')
+  if (members.length >= MAX_MEMBERS) throw new Error(`Event is full (${MAX_MEMBERS} players)`)
   const taken = new Set(members.map(m => m.seat))
   let seat = -1
-  for (let i = 1; i < 8; i++) {
+  for (let i = 1; i < MAX_MEMBERS; i++) {
     if (!taken.has(i)) { seat = i; break }
   }
   if (seat < 0) throw new Error('No free seat')
@@ -248,6 +266,28 @@ export async function bankRing(
   })
 
   return { ok: true, room: updated as Room }
+}
+
+/** End the session if the duration deadline has passed. Idempotent. */
+export async function finishExpired(roomId: string): Promise<Room | null> {
+  const db = createServiceClient()
+  const { data: room } = await db
+    .from('spinna_rooms')
+    .select('*')
+    .eq('id', roomId)
+    .maybeSingle()
+  if (!room || room.status !== 'playing' || !room.started_at) return null
+  const deadline = Date.parse(room.started_at) + room.duration_minutes * 60_000
+  if (Date.now() < deadline) return null
+  const { data } = await db
+    .from('spinna_rooms')
+    .update({ status: 'finished', ended_at: new Date().toISOString() })
+    .eq('id', roomId)
+    .eq('status', 'playing')
+    .select('*')
+    .single()
+  if (data) await logEvent(roomId, null, 'round_end', { reason: 'timeout' })
+  return (data as Room) ?? null
 }
 
 /** Mark a member's tires popped. If every member is popped, flip room to finished. */
