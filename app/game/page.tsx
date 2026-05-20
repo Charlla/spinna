@@ -8,6 +8,7 @@ import SpinnaHud from '@/components/spinna-hud'
 import SpinnaControls from '@/components/spinna-controls'
 import SpinnaTunePanel from '@/components/spinna-tune-panel'
 import PauseOverlay from '@/components/games/PauseOverlay'
+import NeonButton from '@/components/games/NeonButton'
 import { SpinnaCanvasHandle } from '@/components/spinna-canvas'
 import { SAVE_KEY, TUNE_KEY, DEFAULT_SAVE, DEFAULT_TUNE, SaveData, TuneData, GameStats } from '@/lib/spinna-data'
 
@@ -226,6 +227,16 @@ export default function GamePage() {
             open={menuOpen}
             title="PAUSED"
             onResume={() => setMenuOpen(false)}
+            extra={
+              <NeonButton
+                variant="primary"
+                size="md"
+                fullWidth
+                onClick={() => { setMenuOpen(false); handleCashOut() }}
+              >
+                Cash out
+              </NeonButton>
+            }
             onSettings={() => { setMenuOpen(false); openTune() }}
             onQuit={() => { setMenuOpen(false); handleExit() }}
           />

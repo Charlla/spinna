@@ -15,13 +15,11 @@ interface SpinnaHudProps {
 }
 
 /**
- * Spinna in-game HUD — restored to match the original v0 layout.
- *  - Top-left:  SCORE (amber) and BANK (green) chips.
- *  - Top-right: ↩ CASH, ⚙ TUNE, ✕ chip buttons.
- *  - Below:     COMBO N° · MULT ×N · SPINS N row.
- *  - Below:     14px tire health bar with green→yellow→red gradient.
- *  - Center:    Big speed number "kkk KM/H".
- *  - Center top: animated milestone banner.
+ * Spinna in-game HUD.
+ *  - Top-left:  SCORE + BANK chips.
+ *  - Top-right: single ≡ menu chip (cash-out lives inside the menu).
+ *  - Below:     compact combo · mult · spins strip + tire bar.
+ *  - Center:    speed readout + milestone banner.
  *  - When tires pop: floating END ROUND button at the bottom.
  */
 export default function SpinnaHud({
@@ -49,49 +47,39 @@ export default function SpinnaHud({
 
   return (
     <>
-      {/* ── Top row: score/bank + action chips ──────────────────────────── */}
-      <div className="pointer-events-none absolute top-[max(env(safe-area-inset-top),12px)] left-3 right-3 flex items-start gap-2 z-10">
+      {/* ── Top row: score/bank chips + single ≡ menu chip ───────────────── */}
+      <div className="pointer-events-none absolute top-[max(env(safe-area-inset-top),12px)] left-3 right-3 flex items-stretch gap-2 z-10">
         <div className="flex-1 min-w-0 rounded-[3px] border border-white/10 bg-[#0c0c10]/60 backdrop-blur-md px-[10px] py-[6px]">
           <div className="text-[8px] tracking-[2px] text-white/55 font-mono">SCORE</div>
-          <div className="text-[22px] leading-none font-extrabold text-amber-300 font-mono tabular-nums truncate">
+          <div className="text-[20px] leading-none font-extrabold text-amber-300 font-mono tabular-nums truncate">
             {stats.score.toLocaleString()}
           </div>
         </div>
         <div className="flex-1 min-w-0 rounded-[3px] border border-white/10 bg-[#0c0c10]/60 backdrop-blur-md px-[10px] py-[6px]">
           <div className="text-[8px] tracking-[2px] text-white/55 font-mono">BANK</div>
-          <div className="text-[22px] leading-none font-extrabold text-emerald-400 font-mono tabular-nums truncate">
+          <div className="text-[20px] leading-none font-extrabold text-emerald-400 font-mono tabular-nums truncate">
             R{money.toLocaleString()}
           </div>
         </div>
-        <div className="flex flex-col items-stretch gap-1 pointer-events-auto">
-          <button
-            type="button"
-            onClick={onCashOut}
-            aria-label="Cash out and end the round"
-            className="font-mono font-bold text-[9px] tracking-[2px] text-emerald-300 border border-emerald-500/50 bg-[#141418]/70 backdrop-blur-md rounded-[3px] px-[11px] py-[7px] active:bg-[#282832]/85"
-          >
-            ↩ CASH
-          </button>
-          <button
-            type="button"
-            onClick={onMenu}
-            aria-label="Open menu and pause"
-            className="font-mono font-bold text-[9px] tracking-[2px] text-white/85 border border-white/25 bg-[#141418]/70 backdrop-blur-md rounded-[3px] px-[11px] py-[7px] active:bg-[#282832]/85"
-          >
-            ≡ MENU
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={onMenu}
+          aria-label="Open menu (pause, cash out, settings)"
+          className="pointer-events-auto shrink-0 self-stretch font-mono font-bold text-[18px] leading-none text-white/85 border border-white/25 bg-[#141418]/70 backdrop-blur-md rounded-[3px] px-[12px] active:bg-[#282832]/85"
+        >
+          ≡
+        </button>
       </div>
 
-      {/* ── Combo / mult / spins row ────────────────────────────────────── */}
-      <div className="pointer-events-none absolute top-[calc(max(env(safe-area-inset-top),12px)+58px)] left-3 right-3 flex items-center justify-between gap-2 text-[10px] font-mono text-white/55 tracking-[2px] z-10">
+      {/* ── Compact combo strip ─────────────────────────────────────────── */}
+      <div className="pointer-events-none absolute top-[calc(max(env(safe-area-inset-top),12px)+54px)] left-3 right-3 flex items-center justify-between gap-2 text-[9px] font-mono text-white/50 tracking-[2px] z-10">
         <span>COMBO <b className="text-white/85">{Math.floor(stats.comboDeg)}°</b></span>
-        <span>MULT <b className="text-white/85">×{stats.mult.toFixed(1)}</b></span>
+        <span>×<b className="text-white/85">{stats.mult.toFixed(1)}</b></span>
         <span>SPINS <b className="text-white/85">{stats.totalSpins}</b></span>
       </div>
 
       {/* ── Tire health bar ─────────────────────────────────────────────── */}
-      <div className="pointer-events-none absolute top-[calc(max(env(safe-area-inset-top),12px)+78px)] left-3 right-3 z-10">
+      <div className="pointer-events-none absolute top-[calc(max(env(safe-area-inset-top),12px)+72px)] left-3 right-3 z-10">
         <div className="relative h-[14px] rounded-[2px] overflow-hidden border border-white/10 bg-black/55 backdrop-blur-md">
           <div
             className="absolute left-0 top-0 bottom-0"
@@ -113,8 +101,8 @@ export default function SpinnaHud({
       </div>
 
       {/* ── Big speed readout ───────────────────────────────────────────── */}
-      <div className="pointer-events-none absolute top-[calc(max(env(safe-area-inset-top),12px)+106px)] left-1/2 -translate-x-1/2 z-10 flex items-baseline gap-1.5">
-        <span className="text-[26px] leading-none font-extrabold text-white tabular-nums font-mono">{stats.speedKmh}</span>
+      <div className="pointer-events-none absolute top-[calc(max(env(safe-area-inset-top),12px)+98px)] left-1/2 -translate-x-1/2 z-10 flex items-baseline gap-1.5">
+        <span className="text-[24px] leading-none font-extrabold text-white tabular-nums font-mono">{stats.speedKmh}</span>
         <span className="text-[10px] tracking-[3px] font-mono text-white/55">KM/H</span>
       </div>
 
@@ -122,7 +110,7 @@ export default function SpinnaHud({
       {stats.lastBumpCost > 0 && (
         <div
           aria-live="polite"
-          className="pointer-events-none absolute left-1/2 top-[calc(max(env(safe-area-inset-top),12px)+148px)] -translate-x-1/2 z-10 text-center font-mono font-extrabold tracking-[2px]"
+          className="pointer-events-none absolute left-1/2 top-[calc(max(env(safe-area-inset-top),12px)+140px)] -translate-x-1/2 z-10 text-center font-mono font-extrabold tracking-[2px]"
           style={{ color: '#ff2d2d', textShadow: '0 0 18px rgba(0,0,0,0.85)' }}
         >
           <div className="text-2xl">−R{stats.lastBumpCost.toLocaleString()}</div>
@@ -132,7 +120,7 @@ export default function SpinnaHud({
 
       {/* ── Damage tally (small, in the combo row corner) ───────────────── */}
       {stats.damageBumps > 0 && (
-        <div className="pointer-events-none absolute top-[calc(max(env(safe-area-inset-top),12px)+136px)] right-3 z-10 text-right">
+        <div className="pointer-events-none absolute top-[calc(max(env(safe-area-inset-top),12px)+128px)] right-3 z-10 text-right">
           <div className="text-[8px] tracking-[2px] font-mono text-white/45">DAMAGE</div>
           <div className="text-[11px] font-mono text-red-400 tabular-nums">
             ×{stats.damageBumps} <span className="text-white/40">·</span> −R{stats.damagePenalty.toLocaleString()}
@@ -142,7 +130,7 @@ export default function SpinnaHud({
 
       {/* ── Target Hunt: bonus rings progress ──────────────────────────── */}
       {stats.mode === 'targets' && stats.targetsTotal > 0 && (
-        <div className="pointer-events-none absolute top-[calc(max(env(safe-area-inset-top),12px)+136px)] left-3 z-10">
+        <div className="pointer-events-none absolute top-[calc(max(env(safe-area-inset-top),12px)+128px)] left-3 z-10">
           <div className="text-[8px] tracking-[2px] font-mono text-emerald-400/80">RINGS</div>
           <div className="text-[11px] font-mono text-emerald-300 tabular-nums">
             {stats.targetsHit}/{stats.targetsTotal}

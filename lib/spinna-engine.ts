@@ -333,6 +333,30 @@ export class CarPhysics {
     ctx.ellipse(2, 4, hw + 4, h / 2 + 4, 0, 0, TWO_PI)
     ctx.fill()
 
+    // Wheels — drawn UNDER the body so only the protruding outer edge shows.
+    // Tucked just inside the body sill (cx ≈ ±(hw - 0.5)); FRONT wheels rotate
+    // by this.steer so the steered angle is visible at the exposed sliver.
+    const ww = 5, wh = 11
+    const drawWheel = (cx: number, cy: number, rot: number) => {
+      ctx.save()
+      ctx.translate(cx, cy)
+      if (rot) ctx.rotate(rot)
+      ctx.fillStyle = '#0a0a0a'
+      ctx.fillRect(-ww / 2, -wh / 2, ww, wh)
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)'
+      ctx.lineWidth = 0.6
+      ctx.strokeRect(-ww / 2, -wh / 2, ww, wh)
+      // Hub cap
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'
+      ctx.beginPath(); ctx.arc(0, 0, 1.2, 0, TWO_PI); ctx.fill()
+      ctx.restore()
+    }
+    const wheelOffsetX = hw - 0.5
+    drawWheel(-wheelOffsetX, front_y, this.steer)
+    drawWheel( wheelOffsetX, front_y, this.steer)
+    drawWheel(-wheelOffsetX, rear_y,  0)
+    drawWheel( wheelOffsetX, rear_y,  0)
+
     // Body
     const bodyColor = bounceFlash > 0 ? '#ffe4e4' : def.color
     ctx.fillStyle = bodyColor
@@ -407,29 +431,6 @@ export class CarPhysics {
     ctx.fillStyle = '#ffae00'
     ctx.fillRect(-hw + 2, tail_y - 4, 3, 2.5)
     ctx.fillRect(hw - 5,  tail_y - 4, 3, 2.5)
-
-    // Wheels — black with a thin rim outline.
-    // FRONT wheels rotate by this.steer (the actual steered angle in radians).
-    // REAR wheels stay aligned with the body.
-    const ww = 5, wh = 9
-    const drawWheel = (cx: number, cy: number, rot: number) => {
-      ctx.save()
-      ctx.translate(cx, cy)
-      if (rot) ctx.rotate(rot)
-      ctx.fillStyle = '#0a0a0a'
-      ctx.fillRect(-ww / 2, -wh / 2, ww, wh)
-      ctx.strokeStyle = 'rgba(255,255,255,0.18)'
-      ctx.lineWidth = 0.6
-      ctx.strokeRect(-ww / 2, -wh / 2, ww, wh)
-      // Hub cap
-      ctx.fillStyle = 'rgba(255,255,255,0.35)'
-      ctx.beginPath(); ctx.arc(0, 0, 1.2, 0, TWO_PI); ctx.fill()
-      ctx.restore()
-    }
-    drawWheel(-hw - 1, front_y, this.steer)
-    drawWheel( hw + 1, front_y, this.steer)
-    drawWheel(-hw - 1, rear_y,  0)
-    drawWheel( hw + 1, rear_y,  0)
 
     ctx.restore()
   }
