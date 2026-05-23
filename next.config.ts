@@ -1,6 +1,7 @@
 import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   // Canvas is client-only, exclude from server-side rendering
   serverExternalPackages: [],
   typescript: {
