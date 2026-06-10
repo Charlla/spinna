@@ -903,7 +903,7 @@ export default function SpinnaGarage({ save, onSave, onPlay, player, onLogin, on
               <span className="text-[10px] font-mono text-white/60 truncate max-w-[140px]">{player.username}</span>
               <button
                 onClick={onLogout}
-                className="text-[9px] font-mono text-white/30 hover:text-white/60 transition px-2 py-1 border border-white/10 rounded"
+                className="text-[9px] font-mono text-white/30 hover:text-white/60 transition px-3 min-h-[44px] border border-white/10 rounded"
               >
                 OUT
               </button>
@@ -961,7 +961,7 @@ export default function SpinnaGarage({ save, onSave, onPlay, player, onLogin, on
           <div className="space-y-3">
             <button
               onClick={() => setStep('mode')}
-              className="text-[10px] font-mono text-white/40 hover:text-white/70 transition"
+              className="text-[10px] font-mono text-white/40 hover:text-white/70 transition inline-flex items-center min-h-[44px] -my-2 pr-3"
             >
               ← Change mode
             </button>
@@ -982,7 +982,7 @@ export default function SpinnaGarage({ save, onSave, onPlay, player, onLogin, on
           <div className="space-y-3">
             <button
               onClick={() => setStep('car')}
-              className="text-[10px] font-mono text-white/40 hover:text-white/70 transition"
+              className="text-[10px] font-mono text-white/40 hover:text-white/70 transition inline-flex items-center min-h-[44px] -my-2 pr-3"
             >
               ← Back to ride
             </button>
@@ -1000,7 +1000,7 @@ export default function SpinnaGarage({ save, onSave, onPlay, player, onLogin, on
           <div className="space-y-3">
             <button
               onClick={() => setStep('tires')}
-              className="text-[10px] font-mono text-white/40 hover:text-white/70 transition"
+              className="text-[10px] font-mono text-white/40 hover:text-white/70 transition inline-flex items-center min-h-[44px] -my-2 pr-3"
             >
               ← Back to tyres
             </button>
@@ -1021,7 +1021,7 @@ export default function SpinnaGarage({ save, onSave, onPlay, player, onLogin, on
           <div className="space-y-3">
             <button
               onClick={() => setStep('upgrades')}
-              className="text-[10px] font-mono text-white/40 hover:text-white/70 transition"
+              className="text-[10px] font-mono text-white/40 hover:text-white/70 transition inline-flex items-center min-h-[44px] -my-2 pr-3"
             >
               ← Back to mods
             </button>
@@ -1038,7 +1038,7 @@ export default function SpinnaGarage({ save, onSave, onPlay, player, onLogin, on
           <div className="space-y-4">
             <button
               onClick={() => setStep('track')}
-              className="text-[10px] font-mono text-white/40 hover:text-white/70 transition"
+              className="text-[10px] font-mono text-white/40 hover:text-white/70 transition inline-flex items-center min-h-[44px] -my-2 pr-3"
             >
               ← Back to track
             </button>

@@ -15,6 +15,11 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [verifyToken, setVerifyToken] = useState<string | null>(null)
+  // The verify token is only valid for ~30s server-side and request-otp is
+  // constant-response (always 200), so a stale token would silently send no
+  // email. Track when it was issued and force a fresh human check instead.
+  const tokenAtRef = useRef(0)
+  const [hvKey, setHvKey] = useState(0)
   const humanOk = !!verifyToken
   const codeRef = useRef<HTMLInputElement>(null)
 
@@ -22,11 +27,27 @@ export default function LoginPage() {
     if (step === 'code') codeRef.current?.focus()
   }, [step])
 
+  function tokenIsStale() {
+    return !verifyToken || Date.now() - tokenAtRef.current > 25_000
+  }
+
+  function resetHumanCheck(message: string) {
+    setVerifyToken(null)
+    tokenAtRef.current = 0
+    setHvKey(k => k + 1)
+    setStep('email')
+    setError(message)
+  }
+
   async function requestCode(e?: React.FormEvent) {
     e?.preventDefault()
     setError('')
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       setError('Please enter a valid email address.')
+      return
+    }
+    if (tokenIsStale()) {
+      resetHumanCheck('Quick check expired — drag the dot again, then resend.')
       return
     }
     setLoading(true)
@@ -105,7 +126,7 @@ export default function LoginPage() {
                 className="w-full rounded-game-md border border-game-border bg-game-surface px-4 py-3 text-base text-game-ink outline-none placeholder:text-game-ink-faint focus:border-game-accent"
               />
             </div>
-            <HumanVerify onVerified={(t) => setVerifyToken(t)} />
+            <HumanVerify key={hvKey} onVerified={(t) => { setVerifyToken(t); tokenAtRef.current = Date.now() }} />
             {error && <div className="rounded-game-sm bg-game-danger/15 text-game-danger px-3 py-2 text-xs">{error}</div>}
             <button
               type="submit"
@@ -153,7 +174,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => { setStep('email'); setCode(''); setError('') }}
-                className="text-game-ink-muted hover:text-game-ink"
+                className="text-game-ink-muted hover:text-game-ink min-h-[44px] py-2 pr-3 -my-2"
               >
                 ← Use a different email
               </button>
@@ -161,7 +182,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={() => requestCode()}
                 disabled={loading}
-                className="text-game-accent hover:underline disabled:opacity-60"
+                className="text-game-accent hover:underline disabled:opacity-60 min-h-[44px] py-2 pl-3 -my-2"
               >
                 Resend code
               </button>

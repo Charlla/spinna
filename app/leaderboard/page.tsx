@@ -28,7 +28,11 @@ async function getLeaderboard() {
 const VEHICLE_LABELS: Record<string, string> = {
   e30: 'E30',
   e36: 'E36',
+  cressida: 'CRESSIDA',
   rx7: 'RX-7',
+  e46: 'E46 M3',
+  supra: 'SUPRA',
+  skyline: 'R34 GTR',
 }
 
 function formatDate(iso: string) {
@@ -55,7 +59,7 @@ export default async function LeaderboardPage() {
           </div>
           <Link
             href="/"
-            className="text-[10px] font-mono text-white/40 hover:text-white/70 transition px-3 py-1.5 border border-white/10 rounded"
+            className="inline-flex items-center min-h-[44px] text-[10px] font-mono text-white/40 hover:text-white/70 transition px-3 border border-white/10 rounded"
           >
             ← GARAGE
           </Link>

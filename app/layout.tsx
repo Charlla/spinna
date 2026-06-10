@@ -14,6 +14,9 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#0a0807",
+  // Required for env(safe-area-inset-*) to resolve on notched iPhones —
+  // the touch controls + HUD all offset by safe-area insets.
+  viewportFit: "cover",
 }
 
 export default function RootLayout({

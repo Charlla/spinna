@@ -23,7 +23,7 @@ const LABEL: Record<Shape, string> = { circle: 'circle', square: 'square', diamo
 interface Challenge { shapes: Shape[]; target: Shape; challenge: string }
 
 function ShapeIcon({ shape, lit }: { shape: Shape; lit: boolean }) {
-  const glow = lit ? 'border-primary bg-primary/10 scale-110 shadow-sm' : 'border-border'
+  const glow = lit ? 'border-game-accent bg-game-accent/10 scale-110 shadow-game-glow-sm' : 'border-game-border-strong'
   if (shape === 'circle') {
     return <div data-shape={shape} className={`h-11 w-11 rounded-full border-2 transition-all duration-100 ${glow}`} />
   }
@@ -156,21 +156,21 @@ export function HumanVerify({ onVerified }: { onVerified: (verifyToken: string) 
 
   if (done) {
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-success/40 bg-success/10 px-4 py-3 text-sm font-medium text-success">
+      <div className="flex items-center gap-2 rounded-lg border border-game-success/40 bg-game-success/10 px-4 py-3 text-sm font-medium text-game-success">
         <CheckCircle2 className="size-4 shrink-0" /> Human confirmed
       </div>
     )
   }
 
   return (
-    <div className={`select-none rounded-lg border px-4 py-3 transition-colors ${wrong ? 'border-destructive/50 bg-destructive/5' : 'border-border bg-muted/20'}`}>
-      <p className="mb-0.5 text-xs text-muted-foreground">Quick check</p>
+    <div className={`select-none rounded-lg border px-4 py-3 transition-colors ${wrong ? 'border-game-danger/50 bg-game-danger/5' : 'border-game-border bg-game-surface/40'}`}>
+      <p className="mb-0.5 text-xs text-game-ink-muted">Quick check</p>
       {error ? (
-        <div className="mt-2 text-xs text-destructive">
+        <div className="mt-2 text-xs text-game-danger">
           {error} — <button type="button" onClick={loadChallenge} className="underline">retry</button>
         </div>
       ) : !ch ? (
-        <p className="mt-2 text-xs text-muted-foreground">Loading…</p>
+        <p className="mt-2 text-xs text-game-ink-muted">Loading…</p>
       ) : (
         <>
           <p className="mb-4 text-sm">
@@ -192,7 +192,7 @@ export function HumanVerify({ onVerified }: { onVerified: (verifyToken: string) 
                 className="absolute h-9 w-9 rounded-full bg-red-500 shadow-md transition-shadow hover:shadow-lg"
               />
             </div>
-            <span className="shrink-0 text-muted-foreground/40">→</span>
+            <span className="shrink-0 text-game-ink-faint">→</span>
             <div className="flex gap-3">
               {ch.shapes.map((s) => (
                 <ShapeIcon key={s} shape={s} lit={lit === s} />
@@ -201,7 +201,7 @@ export function HumanVerify({ onVerified }: { onVerified: (verifyToken: string) 
           </div>
         </>
       )}
-      {wrong && <p className="mt-2 text-xs text-destructive">Wrong shape — try again</p>}
+      {wrong && <p className="mt-2 text-xs text-game-danger">Wrong shape — try again</p>}
     </div>
   )
 }

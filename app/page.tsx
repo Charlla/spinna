@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import SpinnaGarage from '@/components/spinna-garage'
 import SpinnaIntro from '@/components/spinna-intro'
-import { SAVE_KEY, DEFAULT_SAVE, SaveData } from '@/lib/spinna-data'
+import { SAVE_KEY, DEFAULT_SAVE, SaveData, CARS, TRACKS } from '@/lib/spinna-data'
 
 interface Player {
   id: string
@@ -72,8 +72,19 @@ export default function Home() {
   }
 
   if (showIntro) {
+    // One-tap resume: returning single-player sessions skip the whole garage
+    // walk (mode → ride → tyres → mods → track → spin = 6 taps) and jump
+    // straight into the game with the saved loadout.
+    const canQuickSpin = save.mode === 'free' || save.mode === 'targets'
+    const carName = CARS.find(c => c.id === save.car)?.name ?? save.car
+    const trackName = TRACKS.find(t => t.id === save.track)?.name ?? 'CLASSIC DONUT'
     return (
       <SpinnaIntro
+        quickSpin={canQuickSpin ? {
+          label: 'QUICK SPIN',
+          sub: `${carName} @ ${trackName}`,
+          onGo: handlePlay,
+        } : null}
         onStart={(modeId) => {
           if (modeId === 'multiplayer') { router.push('/online'); return }
           if (modeId === 'passplay') { router.push('/passplay'); return }

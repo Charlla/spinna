@@ -51,6 +51,20 @@ export default function GamePage() {
   const [submitted, setSubmitted] = useState(false)
 
   const [loaded, setLoaded] = useState(false)
+  const [showHint, setShowHint] = useState(false)
+
+  // First-run onboarding: one transient hint chip, never shown again.
+  // Deferred slightly so the canvas paints first.
+  useEffect(() => {
+    if (!started) return
+    try {
+      if (localStorage.getItem('spinna_howto_seen')) return
+      localStorage.setItem('spinna_howto_seen', '1')
+    } catch { return }
+    const show = setTimeout(() => setShowHint(true), 500)
+    const hide = setTimeout(() => setShowHint(false), 7500)
+    return () => { clearTimeout(show); clearTimeout(hide) }
+  }, [started])
 
   // Load save + tune + player
   useEffect(() => {
@@ -205,6 +219,17 @@ export default function GamePage() {
             onMenu={() => setMenuOpen(true)}
           />
           <SpinnaControls inputsRef={inputsRef} resetKey={resetKey} />
+          {showHint && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-[calc(env(safe-area-inset-bottom,16px)+300px)] z-10 flex justify-center px-4">
+              <div className="max-w-xs rounded-lg border border-amber-300/30 bg-black/75 backdrop-blur-md px-4 py-3 text-center font-mono">
+                <div className="text-[10px] text-amber-300 tracking-[3px] font-extrabold">HOW TO SPIN</div>
+                <div className="mt-1 text-[10px] text-white/75 leading-relaxed">
+                  Gas on the right · steer on the left · hold HBRK to break loose.
+                  Circle the green rings for cash, then cash out before your tyres pop.
+                </div>
+              </div>
+            </div>
+          )}
           <PauseOverlay
             open={menuOpen}
             title="PAUSED"

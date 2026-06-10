@@ -1,6 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { createServiceClient } from '@/lib/supabase'
+import { CARS } from '@/lib/spinna-data'
+
+// Server-side sanity bounds for client-reported scores. The client is not
+// trusted blindly: anything outside these caps is a cheat/garbage payload.
+// Legit play sits far below all of them (early rounds ≈ R7–12k, rings pay
+// R7.5k each; even a marathon top-tier session stays well under 5M).
+const MAX_SCORE = 5_000_000
+const MAX_DEGREES = 200_000     // max single-combo degrees (~550 rotations)
+const MAX_COMBO_COUNT = 10_000  // total spins in one round
+const MAX_DURATION_SEC = 6 * 3600
+const VALID_VEHICLES = new Set(CARS.map(c => c.id))
+
+/** Coerce to a bounded non-negative integer; null if not a finite number. */
+function boundedInt(v: unknown, max: number): number | null {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return null
+  const n = Math.floor(v)
+  if (n < 0 || n > max) return null
+  return n
+}
 
 // GET /api/scores?limit=50 → top scores
 export async function GET(req: NextRequest) {
@@ -49,9 +68,18 @@ export async function POST(req: NextRequest) {
 
     const { score, degrees, combo_count, vehicle, duration_sec } = await req.json()
 
-    if (typeof score !== 'number' || score < 0) {
+    const safeScore = boundedInt(score, MAX_SCORE)
+    if (safeScore === null) {
       return NextResponse.json({ error: 'Invalid score' }, { status: 400 })
     }
+    // Secondary fields: clamp to 0 when absent, reject only wildly bogus values.
+    const safeDegrees = boundedInt(degrees ?? 0, MAX_DEGREES)
+    const safeCombo = boundedInt(combo_count ?? 0, MAX_COMBO_COUNT)
+    const safeDuration = boundedInt(duration_sec ?? 0, MAX_DURATION_SEC)
+    if (safeDegrees === null || safeCombo === null || safeDuration === null) {
+      return NextResponse.json({ error: 'Invalid score payload' }, { status: 400 })
+    }
+    const safeVehicle = typeof vehicle === 'string' && VALID_VEHICLES.has(vehicle) ? vehicle : 'e30'
 
     const supabase = createServiceClient()
 
@@ -60,11 +88,11 @@ export async function POST(req: NextRequest) {
       .insert({
         player_id: session.playerId,
         username: session.username,
-        score: Math.floor(score),
-        degrees: Math.floor(degrees ?? 0),
-        combo_count: Math.floor(combo_count ?? 0),
-        vehicle: vehicle ?? 'e30',
-        duration_sec: Math.floor(duration_sec ?? 0),
+        score: safeScore,
+        degrees: safeDegrees,
+        combo_count: safeCombo,
+        vehicle: safeVehicle,
+        duration_sec: safeDuration,
         game_mode: 'classic',
       })
       .select('id, score')
@@ -83,7 +111,7 @@ export async function POST(req: NextRequest) {
       .single()
 
     const updates: Record<string, number> = {
-      total_rands: (player?.total_rands ?? 0) + Math.floor(score),
+      total_rands: (player?.total_rands ?? 0) + safeScore,
       games_played: (player?.games_played ?? 0) + 1,
     }
 
@@ -91,8 +119,8 @@ export async function POST(req: NextRequest) {
       updates.best_score = scoreRow.score
     }
 
-    if (combo_count) {
-      updates.total_spins = (player?.total_spins ?? 0) + Math.floor(combo_count)
+    if (safeCombo > 0) {
+      updates.total_spins = (player?.total_spins ?? 0) + safeCombo
     }
 
     await supabase

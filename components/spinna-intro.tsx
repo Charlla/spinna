@@ -5,6 +5,8 @@ import { GAME_MODES } from '@/lib/spinna-data'
 
 interface SpinnaIntroProps {
   onStart: (modeId: string) => void
+  /** One-tap resume with the saved loadout (single-player modes only). */
+  quickSpin?: { label: string; sub: string; onGo: () => void } | null
 }
 
 function ModeGlyph({ id, color }: { id: string; color: string }) {
@@ -54,7 +56,7 @@ function ModeGlyph({ id, color }: { id: string; color: string }) {
   )
 }
 
-export default function SpinnaIntro({ onStart }: SpinnaIntroProps) {
+export default function SpinnaIntro({ onStart, quickSpin }: SpinnaIntroProps) {
   return (
     <main className="relative min-h-dvh overflow-hidden bg-game-deep text-game-ink">
       {/* AI-generated title art — top half */}
@@ -91,6 +93,19 @@ export default function SpinnaIntro({ onStart }: SpinnaIntroProps) {
             Spin for Rands · Shisa Nyama · Donut till you drop
           </p>
           <div className="max-w-md mx-auto space-y-2.5">
+            {quickSpin && (
+              <button
+                type="button"
+                onClick={quickSpin.onGo}
+                className="w-full rounded-xl px-3 py-3.5 flex items-center justify-between gap-3 font-mono text-black bg-amber-300 hover:bg-amber-200 transition active:scale-[0.985] shadow-[0_0_28px_rgba(252,208,11,0.4)]"
+              >
+                <div className="min-w-0 text-left">
+                  <div className="font-extrabold text-base tracking-[3px]">{quickSpin.label}</div>
+                  <div className="text-[10px] font-bold text-black/65 truncate mt-0.5">{quickSpin.sub}</div>
+                </div>
+                <div className="shrink-0 text-2xl font-bold">▸</div>
+              </button>
+            )}
             {GAME_MODES.map(m => (
               <button
                 key={m.id}
