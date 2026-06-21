@@ -73,7 +73,7 @@ export default function SpinnaIntro({ onStart, quickSpin }: SpinnaIntroProps) {
         >
           <Image
             src="/title-hero.png"
-            alt="Spinmfana"
+            alt="Spinmfana — South African car-spinning arcade game key art"
             fill
             sizes="(max-width: 820px) 120vw, 820px"
             className="object-cover"

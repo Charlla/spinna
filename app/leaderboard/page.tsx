@@ -1,5 +1,21 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createServiceClient } from '@/lib/supabase'
+import JsonLd from '@/components/JsonLd'
+import { SITE_URL, SITE_NAME, OG_IMAGE } from '@/lib/seo'
+
+export const metadata: Metadata = {
+  title: 'Leaderboard',
+  description:
+    'Top Spinmfana drivers ranked by Rands banked. See the highest car-spinning scores, the cars they drove and how many combo spins it took to get there.',
+  alternates: { canonical: '/leaderboard' },
+  openGraph: {
+    title: 'Spinmfana Leaderboard — top car-spinning scores',
+    description: 'The highest Spinmfana scores ranked by Rands banked.',
+    url: `${SITE_URL}/leaderboard`,
+    images: [OG_IMAGE],
+  },
+}
 
 async function getLeaderboard() {
   try {
@@ -48,8 +64,18 @@ export const revalidate = 30
 export default async function LeaderboardPage() {
   const leaderboard = await getLeaderboard()
 
+  const breadcrumbJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: SITE_NAME, item: SITE_URL },
+      { '@type': 'ListItem', position: 2, name: 'Leaderboard', item: `${SITE_URL}/leaderboard` },
+    ],
+  }
+
   return (
     <main className="min-h-dvh bg-[#0a0807] text-white">
+      <JsonLd data={breadcrumbJsonLd} />
       <div className="max-w-lg mx-auto px-4 py-4 sm:py-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">

@@ -1,0 +1,36 @@
+# Spinmfana
+> Spinmfana is a free South African car-spinning (drift) arcade game that runs in any web browser on mobile or desktop. Drift iconic cars, chain combo degrees, spin for Rands and climb the leaderboard.
+
+## What it is
+- Genre: arcade drift / car-spinning game, inspired by South African spinning culture.
+- Price: free. No download and no purchase — it runs in the browser.
+- Platforms: web browser (mobile-first, also desktop).
+- Origin: South Africa (ZA). Currency in-game is the Rand (R).
+
+## How to play
+- Hold throttle, steer into the slide, and tap the handbrake to keep the rear loose.
+- Tight, continuous spins build combo degrees and raise your score multiplier.
+- Cash out before your tyres wear out to bank your Rands.
+- Buy faster cars and better tyres with the Rands you earn.
+
+## Cars
+- BMW E30 325i (starter), BMW E36 328i, Toyota Cressida 2.4i, Mazda RX-7 FC,
+  BMW E46 M3, Toyota Supra 2JZ, Nissan Skyline GTR R34.
+
+## Game modes
+- Free Spin — open donut session; rack up combo degrees.
+- Target Hunt — solo; spin around glowing rings for bonuses.
+- Pass & Play — local hotseat for up to six players sharing one device (60s each).
+
+## Key pages
+- [Play](https://spinmfana.com/): start the game and open the garage.
+- [Leaderboard](https://spinmfana.com/leaderboard): top scores ranked by Rands banked.
+- [Pass & Play](https://spinmfana.com/passplay): local hotseat party mode.
+
+## FAQ
+- Is it free? Yes — completely free, browser-based, no download.
+- Do I need an account? No. You can play as a guest; sign-in only adds your name to the leaderboard.
+- What devices? Any modern mobile or desktop web browser.
+
+## Contact
+- Email: hello@botandbotty.com

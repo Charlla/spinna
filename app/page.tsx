@@ -1,108 +1,93 @@
-'use client'
+import type { Metadata } from 'next'
+import JsonLd from '@/components/JsonLd'
+import { SITE_URL, SITE_NAME, SITE_TAGLINE, SITE_DESCRIPTION, OG_IMAGE, KEY_ART } from '@/lib/seo'
+import HomeClient from './home-client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import SpinnaGarage from '@/components/spinna-garage'
-import SpinnaIntro from '@/components/spinna-intro'
-import { SAVE_KEY, DEFAULT_SAVE, SaveData, CARS, TRACKS } from '@/lib/spinna-data'
-
-interface Player {
-  id: string
-  username: string
-  email: string
+export const metadata: Metadata = {
+  title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+  description: SITE_DESCRIPTION,
+  alternates: { canonical: '/' },
+  openGraph: {
+    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    images: [{ url: OG_IMAGE, width: 1200, height: 630, alt: 'Spinmfana — SA drift arcade key art' }],
+  },
 }
 
-export default function Home() {
-  const router = useRouter()
-  const [save, setSave] = useState<SaveData>({ ...DEFAULT_SAVE })
-  const [player, setPlayer] = useState<Player | null>(null)
-  const [loaded, setLoaded] = useState(false)
-  const [showIntro, setShowIntro] = useState(true)
+// VideoGame schema — the site-specific structured data. Key art is the OG image.
+const videoGameJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'VideoGame',
+  '@id': `${SITE_URL}/#game`,
+  name: SITE_NAME,
+  alternateName: 'Spin Mfana',
+  url: SITE_URL,
+  description: SITE_DESCRIPTION,
+  image: KEY_ART,
+  inLanguage: 'en',
+  applicationCategory: 'Game',
+  genre: ['Arcade', 'Racing', 'Drifting'],
+  gamePlatform: ['Web Browser', 'Mobile'],
+  operatingSystem: 'Any (web browser)',
+  playMode: ['SinglePlayer', 'CoOp'],
+  publisher: { '@id': `${SITE_URL}/#organization` },
+  author: { '@id': `${SITE_URL}/#organization` },
+  countryOfOrigin: 'ZA',
+  offers: {
+    '@type': 'Offer',
+    price: '0',
+    priceCurrency: 'ZAR',
+    availability: 'https://schema.org/InStock',
+  },
+}
 
-  // Load save from localStorage
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(SAVE_KEY)
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        const merged: SaveData = { ...DEFAULT_SAVE, ...parsed }
-        if (!Array.isArray(merged.ownedCars)) merged.ownedCars = ['e30']
-        if (!merged.ownedCars.includes('e30')) merged.ownedCars.push('e30')
-        setSave(merged)
-      }
-    } catch { /* ignore */ }
-    setLoaded(true)
-  }, [])
+// FAQ — genuine, factual Q&A about how the game works (also mirrored in /llms.txt).
+const faqJsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'What is Spinmfana?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Spinmfana is a free South African car-spinning arcade game. You drift iconic cars like the BMW E30, Toyota Cressida and Nissan Skyline R34, chaining combo degrees to spin for Rands and climb the leaderboard.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Is Spinmfana free to play?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Yes. Spinmfana is completely free and runs in your web browser on mobile or desktop — no download, no purchase required.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How do you play Spinmfana?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Hold throttle, steer into the slide and use the handbrake to keep the rear loose. Tight continuous spins build combo degrees and a score multiplier; cash out before your tyres wear out to bank your Rands.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'What game modes are there?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Free Spin (an open donut session), Target Hunt (spin around glowing rings for bonuses) and Pass & Play hotseat for up to six players sharing one device.',
+      },
+    },
+  ],
+}
 
-  // Check auth (silent — guest is fine)
-  useEffect(() => {
-    fetch('/api/auth/me')
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data?.player) setPlayer(data.player) })
-      .catch(() => {})
-  }, [])
-
-  const handleSave = useCallback((newSave: SaveData) => {
-    setSave(newSave)
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify(newSave)) } catch { /* ignore */ }
-  }, [])
-
-  const handlePlay = useCallback(() => {
-    sessionStorage.setItem('spinna_game_save', JSON.stringify(save))
-    router.push('/game')
-  }, [save, router])
-
-  const handleLogin = useCallback(() => {
-    router.push('/auth/login')
-  }, [router])
-
-  const handleLogout = useCallback(async () => {
-    await fetch('/api/auth/logout', { method: 'POST' })
-    setPlayer(null)
-  }, [])
-
-  if (!loaded) {
-    return (
-      <main className="flex min-h-dvh items-center justify-center bg-[#0a0807]">
-        <div className="font-mono text-amber-300 tracking-[6px] text-xs animate-pulse">
-          LOADING SPINMFANA…
-        </div>
-      </main>
-    )
-  }
-
-  if (showIntro) {
-    // One-tap resume: returning single-player sessions skip the whole garage
-    // walk (mode → ride → tyres → mods → track → spin = 6 taps) and jump
-    // straight into the game with the saved loadout.
-    const canQuickSpin = save.mode === 'free' || save.mode === 'targets'
-    const carName = CARS.find(c => c.id === save.car)?.name ?? save.car
-    const trackName = TRACKS.find(t => t.id === save.track)?.name ?? 'CLASSIC DONUT'
-    return (
-      <SpinnaIntro
-        quickSpin={canQuickSpin ? {
-          label: 'QUICK SPIN',
-          sub: `${carName} @ ${trackName}`,
-          onGo: handlePlay,
-        } : null}
-        onStart={(modeId) => {
-          if (modeId === 'multiplayer') { router.push('/online'); return }
-          if (modeId === 'passplay') { router.push('/passplay'); return }
-          handleSave({ ...save, mode: modeId })
-          setShowIntro(false)
-        }}
-      />
-    )
-  }
-
+export default function Page() {
   return (
-    <SpinnaGarage
-      save={save}
-      onSave={handleSave}
-      onPlay={handlePlay}
-      player={player}
-      onLogin={handleLogin}
-      onLogout={handleLogout}
-    />
+    <>
+      <JsonLd data={videoGameJsonLd} />
+      <JsonLd data={faqJsonLd} />
+      <HomeClient />
+    </>
   )
 }
